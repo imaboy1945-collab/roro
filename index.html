@@ -692,125 +692,115 @@ function switchTab(t){
 }
 
 // ─────────────────────────────────────
-// 3. 주소 검색 (Nominatim, 한국 bias)
+// 3. 주소 검색 (카카오 장소검색 API)
 // ─────────────────────────────────────
-var searchMarker = null;
-var kakaoPlaces = null; // 카카오 장소검색 서비스
-
-// 카카오 SDK 로드 완료 후 Places 서비스 초기화
-function initKakaoServices(){
-    try {
-        kakaoPlaces = new kakao.maps.services.Places();
-    } catch(e) {
-        setTimeout(initKakaoServices, 500);
-    }
-}
-initKakaoServices();
+window.searchMarker = null; // window 레벨로 선언해서 스코프 문제 방지
 
 function onSearchInput(el){
     var btn = document.getElementById('search-clear-btn');
-    if(el.value.trim()){
-        btn.classList.add('visible');
-    } else {
-        btn.classList.remove('visible');
-        clearSearchMarker();
-    }
+    btn.classList.toggle('visible', el.value.trim().length > 0);
+    if(!el.value.trim()) removeSearchPin();
 }
 
-function clearSearchMarker(){
-    if(searchMarker){ map.removeLayer(searchMarker); searchMarker = null; }
+function removeSearchPin(){
+    if(window.searchMarker){
+        try { map.removeLayer(window.searchMarker); } catch(e){}
+        window.searchMarker = null;
+    }
     document.getElementById('search-results').innerHTML = '';
 }
 
 function clearSearchFull(){
     document.getElementById('search-input').value = '';
     document.getElementById('search-clear-btn').classList.remove('visible');
-    clearSearchMarker();
+    removeSearchPin();
 }
 
-async function searchAddress(){
+function placeSearchPin(lat, lng, title, sub){
+    if(window.searchMarker){
+        try { map.removeLayer(window.searchMarker); } catch(e){}
+        window.searchMarker = null;
+    }
+    window.searchMarker = L.marker([lat, lng], {
+        icon: L.divIcon({
+            html: '<div style="background:#03c75a;color:white;border-radius:50% 50% 50% 0;width:30px;height:30px;transform:rotate(-45deg);border:2.5px solid white;box-shadow:0 3px 8px rgba(0,0,0,0.25);display:flex;align-items:center;justify-content:center;"><span style="transform:rotate(45deg);font-size:15px;">📍</span></div>',
+            className:'', iconSize:[30,30], iconAnchor:[15,30]
+        })
+    }).addTo(map)
+      .bindPopup('<b>'+title+'</b>'+(sub?'<br><small>'+sub+'</small>':'')).openPopup();
+    document.getElementById('search-clear-btn').classList.add('visible');
+}
+
+function searchAddress(){
     var q = document.getElementById('search-input').value.trim();
     if(!q) return;
     var resultsEl = document.getElementById('search-results');
     resultsEl.innerHTML = '<div class="search-empty">🔍 검색 중...</div>';
 
-    // 카카오 장소검색 API 사용
-    if(kakaoPlaces){
-        kakaoPlaces.keywordSearch(q, function(data, status){
-            if(status === kakao.maps.services.Status.OK && data.length){
-                resultsEl.innerHTML = '';
-                data.slice(0,6).forEach(function(place){
-                    var main = place.place_name;
-                    var road = place.road_address_name;
-                    var jibun = place.address_name;
-                    var sub = road || jibun || '';
-                    var category = place.category_name ? place.category_name.split('>').pop().trim() : '';
-
-                    var div = document.createElement('div');
-                    div.className = 'search-result-item';
-                    div.innerHTML = '<div class="addr-main">' + main
-                        + (category ? ' <span style="font-size:10px;color:var(--text-caption);font-weight:400;">' + category + '</span>' : '')
-                        + '</div>'
-                        + (road ? '<div class="addr-sub">🛣 ' + road + '</div>' : '')
-                        + (jibun && jibun !== road ? '<div class="addr-sub" style="color:var(--text-caption);">📌 ' + jibun + '</div>' : '');
-
-                    div.onclick = function(){
-                        var lat = parseFloat(place.y);
-                        var lng = parseFloat(place.x);
-                        map.setView([lat, lng], 17);
-                        if(searchMarker) map.removeLayer(searchMarker);
-                        searchMarker = L.marker([lat, lng], {
-                            icon: L.divIcon({
-                                html:'<div style="background:#03c75a;color:white;border-radius:50% 50% 50% 0;width:30px;height:30px;transform:rotate(-45deg);border:2.5px solid white;box-shadow:0 3px 8px rgba(0,0,0,0.25);display:flex;align-items:center;justify-content:center;"><span style="transform:rotate(45deg);font-size:15px;">📍</span></div>',
-                                className:'', iconSize:[30,30], iconAnchor:[15,30]
-                            })
-                        }).addTo(map)
-                          .bindPopup('<b>' + main + '</b>' + (sub ? '<br><small>' + sub + '</small>' : ''))
-                          .openPopup();
-                        resultsEl.innerHTML = '';
-                        document.getElementById('search-clear-btn').classList.add('visible');
-                    };
-                    resultsEl.appendChild(div);
-                });
-            } else {
+    // 카카오 장소검색 — 매번 새로 인스턴스 생성 (가장 안정적)
+    try {
+        var ps = new kakao.maps.services.Places();
+        ps.keywordSearch(q, function(data, status){
+            if(status !== kakao.maps.services.Status.OK || !data.length){
                 resultsEl.innerHTML = '<div class="search-empty">검색 결과가 없습니다.</div>';
+                return;
             }
-        }, { location: new kakao.maps.LatLng(37.5263, 126.8962), radius: 20000 });
-    } else {
-        // 카카오 SDK 미로드 시 Nominatim 대체
-        try {
-            var url = 'https://nominatim.openstreetmap.org/search?format=json&q='
-                + encodeURIComponent(q) + '&countrycodes=kr&limit=5&accept-language=ko';
-            var res = await fetch(url, {headers:{'Accept-Language':'ko'}});
-            var data = await res.json();
-            if(!data.length){ resultsEl.innerHTML = '<div class="search-empty">검색 결과가 없습니다.</div>'; return; }
             resultsEl.innerHTML = '';
-            data.forEach(function(item){
-                var parts = item.display_name.split(',');
-                var main = parts[0].trim();
-                var sub  = parts.slice(1,4).join(',').trim();
+            data.slice(0, 6).forEach(function(place){
+                var name     = place.place_name;
+                var road     = place.road_address_name;
+                var jibun    = place.address_name;
+                var category = place.category_name
+                    ? place.category_name.split('>').pop().trim() : '';
                 var div = document.createElement('div');
                 div.className = 'search-result-item';
-                div.innerHTML = '<div class="addr-main">'+main+'</div><div class="addr-sub">'+sub+'</div>';
+                div.innerHTML =
+                    '<div class="addr-main">' + name +
+                    (category ? ' <span style="font-size:10px;color:var(--text-caption);font-weight:400">'+category+'</span>' : '') +
+                    '</div>' +
+                    (road  ? '<div class="addr-sub">🛣 '+road+'</div>' : '') +
+                    (jibun && jibun !== road ? '<div class="addr-sub" style="color:var(--text-caption)">📌 '+jibun+'</div>' : '');
                 div.onclick = function(){
-                    var lat = parseFloat(item.lat); var lng = parseFloat(item.lon);
-                    map.setView([lat,lng], 17);
-                    if(searchMarker) map.removeLayer(searchMarker);
-                    searchMarker = L.marker([lat,lng], {
-                        icon: L.divIcon({
-                            html:'<div style="background:#03c75a;color:white;border-radius:50% 50% 50% 0;width:30px;height:30px;transform:rotate(-45deg);border:2.5px solid white;box-shadow:0 3px 8px rgba(0,0,0,0.25);display:flex;align-items:center;justify-content:center;"><span style="transform:rotate(45deg);font-size:15px;">📍</span></div>',
-                            className:'', iconSize:[30,30], iconAnchor:[15,30]
-                        })
-                    }).addTo(map).bindPopup('<b>'+main+'</b><br><small>'+sub+'</small>').openPopup();
+                    map.setView([parseFloat(place.y), parseFloat(place.x)], 17);
+                    placeSearchPin(parseFloat(place.y), parseFloat(place.x), name, road || jibun);
                     resultsEl.innerHTML = '';
-                    document.getElementById('search-clear-btn').classList.add('visible');
                 };
                 resultsEl.appendChild(div);
             });
-        } catch(e) {
-            resultsEl.innerHTML = '<div class="search-empty">검색 오류가 발생했습니다.</div>';
+        });
+        return; // 카카오 성공 시 여기서 종료
+    } catch(e) {}
+
+    // 카카오 미로드 시 V-World 주소 검색 API 대체
+    fetch('https://api.vworld.kr/req/search?service=search&request=search&version=2.0&crs=EPSG:4326&size=6&page=1&query='
+        + encodeURIComponent(q) + '&type=ADDRESS&format=json&errorformat=json&key=' + VWORLD_KEY)
+    .then(function(r){ return r.json(); })
+    .then(function(json){
+        var items = json.response && json.response.result && json.response.result.items;
+        if(!items || !items.length){
+            resultsEl.innerHTML = '<div class="search-empty">검색 결과가 없습니다.</div>';
+            return;
         }
-    }
+        resultsEl.innerHTML = '';
+        items.forEach(function(item){
+            var title = item.title || item.address.road || item.address.parcel || '';
+            var sub   = item.address.road || item.address.parcel || '';
+            var div   = document.createElement('div');
+            div.className = 'search-result-item';
+            div.innerHTML = '<div class="addr-main">'+title+'</div>'
+                + '<div class="addr-sub">'+sub+'</div>';
+            div.onclick = function(){
+                var pt = item.point;
+                map.setView([parseFloat(pt.y), parseFloat(pt.x)], 17);
+                placeSearchPin(parseFloat(pt.y), parseFloat(pt.x), title, sub);
+                resultsEl.innerHTML = '';
+            };
+            resultsEl.appendChild(div);
+        });
+    })
+    .catch(function(){
+        resultsEl.innerHTML = '<div class="search-empty">검색 오류가 발생했습니다.</div>';
+    });
 }
 
 // ─────────────────────────────────────
