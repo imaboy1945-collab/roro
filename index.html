@@ -439,7 +439,7 @@ var vworldBase      = L.tileLayer('https://xdworld.vworld.kr/2d/Base/service/{z}
 var vworldSatellite = L.tileLayer('https://xdworld.vworld.kr/2d/Satellite/service/{z}/{x}/{y}.jpeg', {maxZoom:19,attribution:'&copy; V-World'});
 var vworldHybrid    = L.tileLayer('https://xdworld.vworld.kr/2d/Hybrid/service/{z}/{x}/{y}.png',     {maxZoom:19,attribution:'&copy; V-World'});
 
-var map = L.map('map',{zoomControl:false,maxZoom:19,layers:[vworldSatellite]}).setView([37.5263,126.8962],16);
+var map = L.map('map',{zoomControl:false,maxZoom:19,layers:[vworldSatellite],doubleClickZoom:false}).setView([37.5263,126.8962],16);
 L.control.zoom({position:'bottomright'}).addTo(map);
 L.control.layers({"🗺️ 일반지도":vworldBase,"🛰️ 위성지도":vworldSatellite},{"🏷️ 하이브리드":vworldHybrid},{position:'topright'}).addTo(map);
 map.on('moveend zoomend', calcTilePreview);
@@ -520,6 +520,9 @@ var MARKER_ICONS = {
 };
 
 function toggleMarkerMode(){
+    // 측정 모드 중이면 종료
+    if(measureMode) stopMeasure();
+
     isMarkerMode = !isMarkerMode;
     var btn = document.getElementById('btn-add-marker');
     var hint = document.getElementById('marker-hint');
@@ -542,6 +545,7 @@ function toggleMarkerMode(){
 document.addEventListener('keydown', function(e){
     if(e.key === 'Escape'){
         if(isMarkerMode) toggleMarkerMode();
+        if(measureMode) clearMeasure();
         closeModal();
     }
 });
@@ -825,6 +829,256 @@ async function largeSave(){
     downloadCanvas(offscreen,'PropMap_Z'+z+'_'+canvasW+'x'+canvasH,ext==='jpeg'?'jpeg':'png',ext==='jpeg'?'image/jpeg':'image/png');
     setStatus('large','✅ 저장 완료 — '+canvasW.toLocaleString()+'×'+canvasH.toLocaleString()+'px'+suffix,'ok');
 }
+
+// ─────────────────────────────────────
+// 8.5 거리·면적 측정
+// ─────────────────────────────────────
+var measureMode = null;          // 'distance' | 'area' | null
+var measurePoints = [];          // [latlng, ...]
+var measureMarkers = [];         // L.circleMarker[]
+var measureLine = null;          // L.polyline | L.polygon
+var measureLabel = null;         // L.marker (결과 표시)
+
+function toggleMeasure(mode){
+    // 다른 모드들 종료
+    if(isMarkerMode) toggleMarkerMode();
+    if(isSelecting) return;
+
+    if(measureMode === mode){
+        stopMeasure();
+        return;
+    }
+
+    clearMeasure();
+    measureMode = mode;
+
+    document.getElementById('btn-measure-distance').classList.toggle('active', mode==='distance');
+    document.getElementById('btn-measure-area').classList.toggle('active', mode==='area');
+    document.getElementById('map').classList.add('measuring-mode');
+
+    var hint = document.getElementById('measure-hint-text');
+    hint.style.display = 'block';
+    hint.innerHTML = mode==='distance'
+        ? '지도를 차례로 클릭해 거리를 측정하세요.<br>마지막 점을 더블클릭하면 종료됩니다.'
+        : '면적을 잴 영역의 꼭짓점을 클릭하세요.<br>마지막 점을 더블클릭하면 자동으로 닫힙니다.';
+}
+
+function stopMeasure(){
+    measureMode = null;
+    document.getElementById('btn-measure-distance').classList.remove('active');
+    document.getElementById('btn-measure-area').classList.remove('active');
+    document.getElementById('map').classList.remove('measuring-mode');
+    document.getElementById('measure-hint-text').style.display = 'none';
+}
+
+function clearMeasure(){
+    measurePoints = [];
+    measureMarkers.forEach(function(m){ map.removeLayer(m); });
+    measureMarkers = [];
+    if(measureLine){ map.removeLayer(measureLine); measureLine = null; }
+    if(measureLabel){ map.removeLayer(measureLabel); measureLabel = null; }
+    document.getElementById('measure-result').classList.remove('visible');
+    document.getElementById('measure-result').textContent = '';
+    stopMeasure();
+}
+
+// 거리(m): Haversine
+function haversine(a, b){
+    var R = 6371000;
+    var dLat = (b.lat-a.lat)*Math.PI/180;
+    var dLng = (b.lng-a.lng)*Math.PI/180;
+    var s1 = Math.sin(dLat/2);
+    var s2 = Math.sin(dLng/2);
+    var x = s1*s1 + Math.cos(a.lat*Math.PI/180)*Math.cos(b.lat*Math.PI/180)*s2*s2;
+    return 2*R*Math.asin(Math.sqrt(x));
+}
+
+// 면적(㎡): Spherical excess (구면 다각형)
+function polygonArea(latlngs){
+    if(latlngs.length < 3) return 0;
+    var R = 6371000;
+    var total = 0;
+    for(var i=0;i<latlngs.length;i++){
+        var p1 = latlngs[i];
+        var p2 = latlngs[(i+1)%latlngs.length];
+        total += (p2.lng - p1.lng)*Math.PI/180
+               * (2 + Math.sin(p1.lat*Math.PI/180) + Math.sin(p2.lat*Math.PI/180));
+    }
+    return Math.abs(total * R * R / 2);
+}
+
+function fmtDistance(m){
+    if(m < 1000) return m.toFixed(1) + ' m';
+    return (m/1000).toFixed(3) + ' km';
+}
+function fmtArea(sqm){
+    var pyeong = sqm / 3.305785;
+    if(sqm < 10000) return sqm.toFixed(1) + ' ㎡ <span style="color:#888;font-weight:normal">(' + pyeong.toFixed(1) + ' 평)</span>';
+    return (sqm/10000).toFixed(4) + ' ha <span style="color:#888;font-weight:normal">(' + pyeong.toFixed(0) + ' 평)</span>';
+}
+
+function updateMeasureDisplay(){
+    var resEl = document.getElementById('measure-result');
+    if(!measurePoints.length){ resEl.classList.remove('visible'); return; }
+    resEl.classList.add('visible');
+
+    if(measureMode === 'distance' || (measureMode === null && measureLine instanceof L.Polyline && !(measureLine instanceof L.Polygon))){
+        var total = 0;
+        for(var i=1;i<measurePoints.length;i++) total += haversine(measurePoints[i-1], measurePoints[i]);
+        resEl.innerHTML = '📏 총 거리: <b>'+fmtDistance(total)+'</b>'
+            + '<br><span style="font-size:11px;color:#888">'+measurePoints.length+'개 지점</span>';
+    } else if(measureMode === 'area' || measureLine instanceof L.Polygon){
+        var area = polygonArea(measurePoints);
+        var perimeter = 0;
+        for(var i=0;i<measurePoints.length;i++){
+            perimeter += haversine(measurePoints[i], measurePoints[(i+1)%measurePoints.length]);
+        }
+        resEl.innerHTML = '📐 면적: <b>'+fmtArea(area)+'</b>'
+            + '<br>둘레: '+fmtDistance(perimeter)
+            + '<br><span style="font-size:11px;color:#888">'+measurePoints.length+'개 꼭짓점</span>';
+    }
+}
+
+// 지도 클릭 → 측정 점 추가 (마커 추가 모드 핸들러와 분리)
+map.on('click', function(e){
+    if(!measureMode) return;
+    measurePoints.push(e.latlng);
+
+    var dot = L.circleMarker(e.latlng, {
+        radius: 5, color:'#fff', weight:2,
+        fillColor:'#2980b9', fillOpacity:1
+    }).addTo(map);
+    measureMarkers.push(dot);
+
+    // 라인/폴리곤 갱신
+    if(measureLine){ map.removeLayer(measureLine); }
+    if(measureMode === 'distance'){
+        measureLine = L.polyline(measurePoints, {color:'#2980b9', weight:3, dashArray:'5 5'}).addTo(map);
+    } else {
+        if(measurePoints.length >= 2){
+            measureLine = L.polygon(measurePoints, {
+                color:'#2980b9', weight:2,
+                fillColor:'#3498db', fillOpacity:0.2, dashArray:'5 5'
+            }).addTo(map);
+        }
+    }
+    updateMeasureDisplay();
+});
+
+// 더블클릭 → 측정 종료
+map.on('dblclick', function(e){
+    if(!measureMode) return;
+    L.DomEvent.stopPropagation(e);
+    if(measurePoints.length < (measureMode==='area'?3:2)){
+        return;
+    }
+    stopMeasure();
+});
+
+// ─────────────────────────────────────
+// 8.6 공유 링크
+// ─────────────────────────────────────
+function buildShareUrl(){
+    var c = map.getCenter();
+    var z = map.getZoom();
+    var params = new URLSearchParams();
+    params.set('lat', c.lat.toFixed(6));
+    params.set('lng', c.lng.toFixed(6));
+    params.set('z', z);
+
+    // 마커 직렬화 (간단 포맷)
+    if(markers.length){
+        var arr = markers.map(function(m){
+            return [
+                m.latlng.lat.toFixed(6),
+                m.latlng.lng.toFixed(6),
+                encodeURIComponent(m.title),
+                encodeURIComponent(m.memo || ''),
+                m.color.replace('#','')
+            ].join('~');
+        });
+        params.set('m', arr.join('|'));
+    }
+
+    return location.origin + location.pathname + '?' + params.toString();
+}
+
+function showToast(msg){
+    var t = document.getElementById('share-toast');
+    t.textContent = msg;
+    t.classList.add('visible');
+    setTimeout(function(){ t.classList.remove('visible'); }, 2200);
+}
+
+async function copyShareLink(){
+    var url = buildShareUrl();
+    try {
+        await navigator.clipboard.writeText(url);
+        showToast('✅ 링크가 복사되었습니다');
+    } catch(e) {
+        // fallback
+        var ta = document.createElement('textarea');
+        ta.value = url; document.body.appendChild(ta);
+        ta.select(); document.execCommand('copy');
+        document.body.removeChild(ta);
+        showToast('✅ 링크가 복사되었습니다');
+    }
+}
+
+function shareKakao(){
+    var url = buildShareUrl();
+    var text = '📍 PropMap 지도 보기';
+    // 카카오 SDK 없이도 동작: 모바일에서는 카카오톡 공유 시트 호출
+    if(navigator.share){
+        navigator.share({title:'PropMap 지도', text:text, url:url})
+            .catch(function(){});
+    } else {
+        // 데스크탑: 링크 복사 + 안내
+        navigator.clipboard.writeText(url).then(function(){
+            showToast('💬 링크 복사됨 — 카카오톡에 붙여넣기');
+        });
+    }
+}
+
+// 페이지 로드 시 URL 파라미터 → 지도 복원
+(function restoreFromUrl(){
+    var p = new URLSearchParams(location.search);
+    if(p.has('lat') && p.has('lng')){
+        var lat = parseFloat(p.get('lat'));
+        var lng = parseFloat(p.get('lng'));
+        var z = parseInt(p.get('z') || '16');
+        map.setView([lat,lng], z);
+    }
+    if(p.has('m')){
+        var arr = p.get('m').split('|');
+        arr.forEach(function(s){
+            var parts = s.split('~');
+            if(parts.length < 5) return;
+            var lat = parseFloat(parts[0]);
+            var lng = parseFloat(parts[1]);
+            var title = decodeURIComponent(parts[2]);
+            var memo  = decodeURIComponent(parts[3]);
+            var color = '#' + parts[4];
+            var icon  = MARKER_ICONS[color] || '📍';
+            var id    = Date.now() + Math.random();
+
+            var leafletMarker = L.marker([lat,lng], {
+                icon: L.divIcon({
+                    html: '<div style="width:32px;height:32px;background:'+color+';border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:2.5px solid white;box-shadow:0 3px 8px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;"><span style="transform:rotate(45deg);font-size:15px;">'+icon+'</span></div>',
+                    className:'', iconSize:[32,32], iconAnchor:[16,32]
+                })
+            }).addTo(map);
+
+            var popupHtml = '<div style="min-width:160px"><b style="font-size:13px;color:'+color+'">'+icon+' '+title+'</b>'
+                + (memo ? '<p style="font-size:12px;margin:6px 0 0;color:#555">'+memo+'</p>' : '')
+                + '<p style="font-size:10px;margin:6px 0 0;color:#aaa">'+lat.toFixed(6)+', '+lng.toFixed(6)+'</p></div>';
+            leafletMarker.bindPopup(popupHtml);
+
+            markers.push({id:id, title:title, memo:memo, color:color, icon:icon, latlng:L.latLng(lat,lng), leafletMarker:leafletMarker});
+        });
+        renderMarkerList();
+    }
+})();
 
 // ─────────────────────────────────────
 // 9. 유틸
