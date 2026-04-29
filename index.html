@@ -391,23 +391,24 @@
 
     /* 줌 컨트롤 위치 보정 */
     .leaflet-bottom.leaflet-right {
-        bottom: 24px !important;
+        bottom: 80px !important;
         right: 16px !important;
     }
     .leaflet-control-zoom {
         border: none !important;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.15) !important;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.18) !important;
     }
     .leaflet-control-zoom a {
-        width: 36px !important; height: 36px !important;
-        line-height: 36px !important;
-        font-size: 18px !important;
-        border-radius: 8px !important;
+        width: 38px !important; height: 38px !important;
+        line-height: 38px !important;
+        font-size: 20px !important;
         background: white !important;
         color: var(--dark) !important;
+        display: block !important;
     }
-    .leaflet-control-zoom a:first-child { margin-bottom: 4px !important; border-radius: 8px !important; }
-    .leaflet-control-zoom a:hover { background: var(--primary-light) !important; }
+    .leaflet-control-zoom-in  { border-radius: 8px 8px 0 0 !important; border-bottom: 1px solid var(--border) !important; }
+    .leaflet-control-zoom-out { border-radius: 0 0 8px 8px !important; }
+    .leaflet-control-zoom a:hover { background: var(--primary-light) !important; color: var(--primary) !important; }
 
     #marker-hint {
         display: none; position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
@@ -645,49 +646,23 @@ function toggleSidebar(){
 var VWORLD_KEY = 'B6D9676E-5117-3967-9D0C-DBF1870495CD';
 
 // ─────────────────────────────────────
-// 카카오 타일 (V-World 장애 시 백업)
-// ─────────────────────────────────────
-var kakaoSatellite = L.tileLayer(
-    'https://map{s}.daumcdn.net/map_skyview/L{z}/{y}/{x}.jpg?v=160114',
-    { maxZoom:19, subdomains:['1','2','3','4'], attribution:'&copy; Kakao' }
-);
-var kakaoBase = L.tileLayer(
-    'https://map{s}.daumcdn.net/map_2d/L{z}/{y}/{x}.png',
-    { maxZoom:19, subdomains:['1','2','3','4'], attribution:'&copy; Kakao' }
-);
-
-// ─────────────────────────────────────
 // 1. 지도 초기화
 // ─────────────────────────────────────
-var vworldBase      = L.tileLayer('https://api.vworld.kr/req/wmts/1.0.0/'+VWORLD_KEY+'/Base/{z}/{y}/{x}.png',       {maxZoom:19, attribution:'&copy; V-World'});
-var vworldSatellite = L.tileLayer('https://api.vworld.kr/req/wmts/1.0.0/'+VWORLD_KEY+'/Satellite/{z}/{y}/{x}.jpeg', {maxZoom:19, attribution:'&copy; V-World'});
-var vworldHybrid    = L.tileLayer('https://api.vworld.kr/req/wmts/1.0.0/'+VWORLD_KEY+'/Hybrid/{z}/{y}/{x}.png',     {maxZoom:19, attribution:'&copy; V-World'});
+var vworldBase      = L.tileLayer('https://xdworld.vworld.kr/2d/Base/service/{z}/{x}/{y}.png',       {maxZoom:19, attribution:'&copy; V-World'});
+var vworldSatellite = L.tileLayer('https://xdworld.vworld.kr/2d/Satellite/service/{z}/{x}/{y}.jpeg', {maxZoom:19, attribution:'&copy; V-World'});
+var vworldHybrid    = L.tileLayer('https://xdworld.vworld.kr/2d/Hybrid/service/{z}/{x}/{y}.png',     {maxZoom:19, attribution:'&copy; V-World'});
 
 var map = L.map('map',{zoomControl:false,maxZoom:19,layers:[vworldSatellite],doubleClickZoom:false}).setView([37.5263,126.8962],16);
 L.control.zoom({position:'bottomright'}).addTo(map);
 L.control.layers(
     {
-        "🛰️ 위성 (V-World)":  vworldSatellite,
-        "🗺️ 일반 (V-World)":   vworldBase,
-        "🛰️ 위성 (Kakao)":     kakaoSatellite,
-        "🗺️ 일반 (Kakao)":     kakaoBase
+        "🛰️ 위성 (V-World)": vworldSatellite,
+        "🗺️ 일반 (V-World)":  vworldBase
     },
     {"🏷️ 하이브리드": vworldHybrid},
     {position:'topright'}
 ).addTo(map);
 map.on('moveend zoomend', calcTilePreview);
-
-// V-World 타일 오류 감지 → 카카오 자동 전환
-var vworldErrorCount = 0;
-vworldSatellite.on('tileerror', function(){
-    vworldErrorCount++;
-    if(vworldErrorCount >= 3 && map.hasLayer(vworldSatellite)){
-        map.removeLayer(vworldSatellite);
-        map.addLayer(kakaoSatellite);
-        showToast('⚠️ V-World 연결 불안정 — 카카오 위성으로 전환됨');
-        vworldErrorCount = 0;
-    }
-});
 
 // ─────────────────────────────────────
 // 2. 탭 전환
@@ -1020,7 +995,7 @@ async function largeSave(){
 
     var extMap={'Base':'png','Satellite':'jpeg','Hybrid':'png'};
     var ext=extMap[tileType];
-    var urlTpl='https://api.vworld.kr/req/wmts/1.0.0/'+VWORLD_KEY+'/'+tileType+'/{z}/{y}/{x}.'+ext;
+    var urlTpl='https://xdworld.vworld.kr/2d/'+tileType+'/service/{z}/{x}/{y}.'+ext;
     var canvasW=tW*256, canvasH=tH*256;
     var offscreen=document.createElement('canvas');
     offscreen.width=canvasW; offscreen.height=canvasH;
