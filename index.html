@@ -58,11 +58,11 @@
         min-width: 0;
     }
 
-    /* 토글 버튼 */
+    /* 토글 버튼 — fixed로 항상 화면에 표시 */
     #sidebar-toggle {
-        position: absolute;
+        position: fixed;
         top: 50%;
-        right: -18px;
+        left: 360px;
         transform: translateY(-50%);
         width: 18px; height: 52px;
         background: var(--card);
@@ -73,12 +73,12 @@
         z-index: 1001;
         display: flex; align-items: center; justify-content: center;
         box-shadow: 3px 0 8px rgba(0,0,0,0.08);
-        transition: background 0.15s;
+        transition: left 0.28s cubic-bezier(.4,0,.2,1), background 0.15s;
     }
     #sidebar-toggle:hover { background: var(--primary-light); }
     #sidebar-toggle svg { transition: transform 0.28s; }
-    #sidebar.collapsed #sidebar-toggle { right: -18px; }
-    #sidebar.collapsed #sidebar-toggle svg { transform: rotate(180deg); }
+    body.sidebar-collapsed #sidebar-toggle { left: 0; }
+    body.sidebar-collapsed #sidebar-toggle svg { transform: rotate(180deg); }
 
     /* 사이드바 내부 스크롤 영역 */
     #sidebar-inner {
@@ -610,6 +610,7 @@
 function toggleSidebar(){
     var sb = document.getElementById('sidebar');
     sb.classList.toggle('collapsed');
+    document.body.classList.toggle('sidebar-collapsed');
     map.invalidateSize();
 }
 
