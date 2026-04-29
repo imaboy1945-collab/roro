@@ -12,14 +12,178 @@
         * { box-sizing: border-box; }
         body { font-family: 'Malgun Gothic', sans-serif; margin: 0; padding: 0; display: flex; height: 100vh; overflow: hidden; }
 
+        /* ── 사이드바 ── */
         #sidebar {
             width: 390px; background: #fff;
             box-shadow: 3px 0 12px rgba(0,0,0,0.12);
             z-index: 1000; display: flex; flex-direction: column;
             padding: 20px; overflow-y: auto;
         }
-        .logo { font-size: 20px; font-weight: bold; color: #1a252f; margin-bottom: 24px; display: flex; align-items: center; gap: 8px; }
+        .logo { font-size: 20px; font-weight: bold; color: #1a252f; margin-bottom: 18px; display: flex; align-items: center; gap: 8px; }
 
+        /* ── 주소 검색 패널 ── */
+        .search-panel {
+            background: #f8f9fa;
+            border: 1.5px solid #e9ecef;
+            border-radius: 12px; padding: 14px; margin-bottom: 14px;
+        }
+        .search-panel-title { font-size: 12px; font-weight: bold; color: #495057; margin-bottom: 10px; display: flex; align-items: center; gap: 5px; }
+        .search-row { display: flex; gap: 6px; }
+        .search-row input {
+            flex: 1; padding: 9px 12px; border: 1.5px solid #dee2e6;
+            border-radius: 8px; font-size: 13px; outline: none;
+            font-family: 'Malgun Gothic', sans-serif;
+            transition: border-color 0.2s;
+        }
+        .search-row input:focus { border-color: #2980b9; }
+        .search-row button {
+            padding: 9px 14px; background: #2980b9; color: white;
+            border: none; border-radius: 8px; font-size: 13px;
+            cursor: pointer; white-space: nowrap; transition: background 0.2s;
+        }
+        .search-row button:hover { background: #2471a3; }
+
+        #search-results {
+            margin-top: 8px; max-height: 160px; overflow-y: auto;
+        }
+        .search-result-item {
+            padding: 8px 10px; border-radius: 6px; cursor: pointer;
+            font-size: 12px; color: #343a40; border-bottom: 1px solid #f1f3f5;
+            transition: background 0.15s;
+        }
+        .search-result-item:hover { background: #e9f4fb; color: #2980b9; }
+        .search-result-item .addr-main { font-weight: bold; font-size: 12px; }
+        .search-result-item .addr-sub  { font-size: 11px; color: #868e96; margin-top: 2px; }
+        .search-empty { font-size: 12px; color: #868e96; padding: 8px 4px; text-align: center; }
+
+        /* ── 마커 메모 패널 ── */
+        .marker-panel {
+            background: #fff8f0;
+            border: 1.5px solid #ffe0b2;
+            border-radius: 12px; padding: 14px; margin-bottom: 14px;
+        }
+        .marker-panel-title { font-size: 12px; font-weight: bold; color: #e67e22; margin-bottom: 10px; display: flex; align-items: center; gap: 5px; }
+        
+        .marker-mode-row { display: flex; gap: 6px; margin-bottom: 10px; }
+        .marker-mode-btn {
+            flex: 1; padding: 8px; border-radius: 7px; border: 1.5px solid #ffe0b2;
+            background: white; color: #e67e22; font-size: 11px; font-weight: bold;
+            cursor: pointer; text-align: center; transition: all 0.2s;
+        }
+        .marker-mode-btn:hover { background: #fff3e0; }
+        .marker-mode-btn.active { background: #e67e22; color: white; border-color: #e67e22; }
+
+        .marker-list { max-height: 200px; overflow-y: auto; }
+        .marker-item {
+            display: flex; align-items: flex-start; gap: 8px;
+            padding: 8px; border-radius: 8px; margin-bottom: 6px;
+            background: white; border: 1px solid #ffe0b2;
+            cursor: pointer; transition: all 0.15s;
+        }
+        .marker-item:hover { border-color: #e67e22; background: #fff8f0; }
+        .marker-item-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+        .marker-item-body { flex: 1; min-width: 0; }
+        .marker-item-title { font-size: 12px; font-weight: bold; color: #343a40; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .marker-item-memo  { font-size: 11px; color: #868e96; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .marker-item-del { background: none; border: none; color: #ced4da; font-size: 14px; cursor: pointer; padding: 0 2px; transition: color 0.15s; flex-shrink: 0; }
+        .marker-item-del:hover { color: #e74c3c; }
+        .marker-empty { font-size: 12px; color: #adb5bd; text-align: center; padding: 12px 0; }
+
+        /* ── 마커 팝업 모달 ── */
+        #marker-modal {
+            display: none; position: fixed; inset: 0;
+            background: rgba(0,0,0,0.45); z-index: 9998;
+            align-items: center; justify-content: center;
+        }
+        #marker-modal.active { display: flex; }
+        .modal-box {
+            background: white; border-radius: 14px;
+            padding: 22px 24px; width: 320px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+            animation: popIn 0.2s ease;
+        }
+        @keyframes popIn { from{transform:scale(0.9);opacity:0} to{transform:scale(1);opacity:1} }
+        .modal-title { font-size: 15px; font-weight: bold; color: #1a252f; margin-bottom: 16px; }
+        .modal-label { font-size: 11px; color: #868e96; margin-bottom: 4px; margin-top: 12px; }
+        .modal-input {
+            width: 100%; padding: 9px 11px; border: 1.5px solid #dee2e6;
+            border-radius: 8px; font-size: 13px; outline: none;
+            font-family: 'Malgun Gothic', sans-serif; transition: border-color 0.2s;
+        }
+        .modal-input:focus { border-color: #e67e22; }
+        .modal-textarea {
+            width: 100%; padding: 9px 11px; border: 1.5px solid #dee2e6;
+            border-radius: 8px; font-size: 12px; outline: none; resize: vertical;
+            min-height: 72px; font-family: 'Malgun Gothic', sans-serif;
+            transition: border-color 0.2s;
+        }
+        .modal-textarea:focus { border-color: #e67e22; }
+        .modal-color-row { display: flex; gap: 8px; margin-top: 4px; }
+        .color-dot {
+            width: 26px; height: 26px; border-radius: 50%; cursor: pointer;
+            border: 3px solid transparent; transition: transform 0.15s;
+        }
+        .color-dot:hover { transform: scale(1.15); }
+        .color-dot.selected { border-color: #343a40; }
+        .modal-btn-row { display: flex; gap: 8px; margin-top: 18px; }
+        .modal-btn {
+            flex: 1; padding: 10px; border-radius: 8px; border: none;
+            font-size: 13px; font-weight: bold; cursor: pointer; transition: all 0.2s;
+        }
+        .modal-btn-cancel { background: #f1f3f5; color: #868e96; }
+        .modal-btn-cancel:hover { background: #e9ecef; }
+        .modal-btn-save { background: #e67e22; color: white; }
+        .modal-btn-save:hover { background: #d35400; }
+
+        /* ── 측정 도구 패널 ── */
+        .measure-panel {
+            background: #eef5fb;
+            border: 1.5px solid #c5dff0;
+            border-radius: 12px; padding: 14px; margin-bottom: 14px;
+        }
+        .measure-panel-title { font-size: 12px; font-weight: bold; color: #2980b9; margin-bottom: 10px; display: flex; align-items: center; gap: 5px; }
+        .measure-btn-row { display: flex; gap: 6px; margin-bottom: 8px; }
+        .measure-btn {
+            flex: 1; padding: 9px 6px; border-radius: 7px; border: 1.5px solid #c5dff0;
+            background: white; color: #2980b9; font-size: 11px; font-weight: bold;
+            cursor: pointer; text-align: center; transition: all 0.2s;
+        }
+        .measure-btn:hover { background: #d6e9f8; }
+        .measure-btn.active { background: #2980b9; color: white; border-color: #2980b9; }
+        .measure-result {
+            background: white; border: 1px solid #c5dff0;
+            border-radius: 8px; padding: 9px 11px;
+            font-size: 12px; color: #2c3e50; line-height: 1.7;
+            display: none;
+        }
+        .measure-result.visible { display: block; }
+        .measure-result b { color: #2980b9; font-size: 13px; }
+        .measure-hint-text { font-size: 11px; color: #6c8ea8; margin-top: 6px; line-height: 1.4; }
+
+        /* ── 공유 패널 ── */
+        .share-panel {
+            background: #f3eef9;
+            border: 1.5px solid #d8c8e8;
+            border-radius: 12px; padding: 14px; margin-bottom: 14px;
+        }
+        .share-panel-title { font-size: 12px; font-weight: bold; color: #8e44ad; margin-bottom: 10px; display: flex; align-items: center; gap: 5px; }
+        .share-btn-row { display: flex; gap: 6px; }
+        .share-btn {
+            flex: 1; padding: 9px; border-radius: 7px; border: none;
+            background: linear-gradient(135deg, #8e44ad, #9b59b6); color: white;
+            font-size: 12px; font-weight: bold; cursor: pointer; transition: all 0.2s;
+        }
+        .share-btn:hover { filter: brightness(1.1); transform: translateY(-1px); }
+        .share-toast {
+            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+            background: #1a252f; color: white; padding: 12px 22px;
+            border-radius: 24px; font-size: 13px; font-weight: bold;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.25); z-index: 9997;
+            opacity: 0; pointer-events: none; transition: opacity 0.3s, transform 0.3s;
+        }
+        .share-toast.visible { opacity: 1; transform: translateX(-50%) translateY(-6px); }
+
+        /* ── 내보내기 패널 ── */
         .export-panel {
             background: linear-gradient(160deg, #1a252f 0%, #2c3e50 100%);
             border-radius: 12px; padding: 16px; margin-bottom: 18px; color: white;
@@ -74,6 +238,7 @@
         .btn-orange { background: linear-gradient(135deg, #e67e22, #f39c12); color: white; }
         .btn-ghost  { background: rgba(255,255,255,0.1); border: 1.5px solid rgba(255,255,255,0.25) !important; color: white; }
 
+        /* ── 로딩 오버레이 ── */
         #capture-overlay {
             display: none; position: fixed; inset: 0;
             background: rgba(0,0,0,0.75); z-index: 9999;
@@ -90,10 +255,28 @@
 
         #map { flex: 1; height: 100%; }
         #map.selecting-mode { cursor: crosshair !important; }
+        #map.marker-adding-mode { cursor: cell !important; }
+        #map.measuring-mode { cursor: crosshair !important; }
+
+        /* 마커 추가 중 힌트 */
+        #marker-hint {
+            display: none; position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
+            background: #e67e22; color: white; padding: 8px 18px;
+            border-radius: 20px; font-size: 13px; font-weight: bold;
+            z-index: 5000; box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            pointer-events: none;
+        }
+        #marker-hint.visible { display: block; }
+
+        /* 스크롤바 */
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
     </style>
 </head>
 <body>
 
+<!-- 로딩 오버레이 -->
 <div id="capture-overlay">
     <div class="spinner"></div>
     <div id="overlay-msg">타일을 불러오는 중...</div>
@@ -101,9 +284,83 @@
     <div id="overlay-prog"><div id="overlay-prog-bar"></div></div>
 </div>
 
+<!-- 마커 추가 힌트 -->
+<div id="marker-hint">📍 지도를 클릭해서 핀을 꽂으세요 &nbsp;|&nbsp; ESC 취소</div>
+
+<!-- 공유 토스트 -->
+<div class="share-toast" id="share-toast"></div>
+
+<!-- 마커 메모 모달 -->
+<div id="marker-modal">
+    <div class="modal-box">
+        <div class="modal-title">📍 핀 메모 추가</div>
+        <div class="modal-label">제목</div>
+        <input class="modal-input" id="m-title" type="text" placeholder="예) 관심 매물, 투자 후보지" maxlength="40" />
+        <div class="modal-label">메모</div>
+        <textarea class="modal-textarea" id="m-memo" placeholder="가격, 면적, 특이사항 등 자유롭게 입력"></textarea>
+        <div class="modal-label">색상</div>
+        <div class="modal-color-row">
+            <div class="color-dot selected" style="background:#e74c3c" data-color="#e74c3c" onclick="selectColor(this)"></div>
+            <div class="color-dot" style="background:#e67e22" data-color="#e67e22" onclick="selectColor(this)"></div>
+            <div class="color-dot" style="background:#2ecc71" data-color="#2ecc71" onclick="selectColor(this)"></div>
+            <div class="color-dot" style="background:#3498db" data-color="#3498db" onclick="selectColor(this)"></div>
+            <div class="color-dot" style="background:#9b59b6" data-color="#9b59b6" onclick="selectColor(this)"></div>
+            <div class="color-dot" style="background:#1a252f" data-color="#1a252f" onclick="selectColor(this)"></div>
+        </div>
+        <div class="modal-btn-row">
+            <button class="modal-btn modal-btn-cancel" onclick="closeModal()">취소</button>
+            <button class="modal-btn modal-btn-save" onclick="saveMarker()">저장</button>
+        </div>
+    </div>
+</div>
+
 <div id="sidebar">
     <div class="logo">🏢 My PropMap</div>
-    
+
+    <!-- ── 주소 검색 ── -->
+    <div class="search-panel">
+        <div class="search-panel-title">🔍 주소 검색</div>
+        <div class="search-row">
+            <input type="text" id="search-input" placeholder="주소 또는 장소명 입력" onkeydown="if(event.key==='Enter')searchAddress()" />
+            <button onclick="searchAddress()">검색</button>
+        </div>
+        <div id="search-results"></div>
+    </div>
+
+    <!-- ── 마커 메모 ── -->
+    <div class="marker-panel">
+        <div class="marker-panel-title">📍 핀 메모</div>
+        <div class="marker-mode-row">
+            <div class="marker-mode-btn" id="btn-add-marker" onclick="toggleMarkerMode()">+ 핀 추가</div>
+            <div class="marker-mode-btn" id="btn-clear-markers" onclick="clearAllMarkers()" style="color:#e74c3c;border-color:#ffc9a3;">🗑 전체 삭제</div>
+        </div>
+        <div class="marker-list" id="marker-list">
+            <div class="marker-empty">핀이 없습니다.<br>지도를 클릭해 관심지역을 표시하세요.</div>
+        </div>
+    </div>
+
+    <!-- ── 측정 도구 ── -->
+    <div class="measure-panel">
+        <div class="measure-panel-title">📐 거리·면적 측정</div>
+        <div class="measure-btn-row">
+            <div class="measure-btn" id="btn-measure-distance" onclick="toggleMeasure('distance')">📏 거리</div>
+            <div class="measure-btn" id="btn-measure-area" onclick="toggleMeasure('area')">📐 면적</div>
+            <div class="measure-btn" id="btn-measure-clear" onclick="clearMeasure()" style="color:#e74c3c;border-color:#f5c6cb;">🗑 지우기</div>
+        </div>
+        <div class="measure-result" id="measure-result"></div>
+        <div class="measure-hint-text" id="measure-hint-text" style="display:none;"></div>
+    </div>
+
+    <!-- ── 공유 ── -->
+    <div class="share-panel">
+        <div class="share-panel-title">🔗 지도 공유</div>
+        <div class="share-btn-row">
+            <button class="share-btn" onclick="copyShareLink()">📋 링크 복사</button>
+            <button class="share-btn" onclick="shareKakao()" style="background:linear-gradient(135deg,#f1c40f,#f39c12);color:#3d2c00;">💬 카카오톡</button>
+        </div>
+    </div>
+
+    <!-- ── 내보내기 ── -->
     <div class="export-panel">
         <div class="export-panel-title">📸 지도 이미지 내보내기</div>
 
@@ -176,7 +433,7 @@
 
 <script>
 // ─────────────────────────────────────
-// 1. 지도 초기화 (최대 줌 19, 기본 위성지도)
+// 1. 지도 초기화
 // ─────────────────────────────────────
 var vworldBase      = L.tileLayer('https://xdworld.vworld.kr/2d/Base/service/{z}/{x}/{y}.png',       {maxZoom:19,attribution:'&copy; V-World'});
 var vworldSatellite = L.tileLayer('https://xdworld.vworld.kr/2d/Satellite/service/{z}/{x}/{y}.jpeg', {maxZoom:19,attribution:'&copy; V-World'});
@@ -198,7 +455,194 @@ function switchTab(t){
 }
 
 // ─────────────────────────────────────
-// 3. 영역 선택
+// 3. 주소 검색 (Nominatim, 한국 bias)
+// ─────────────────────────────────────
+var searchMarker = null;
+
+async function searchAddress(){
+    var q = document.getElementById('search-input').value.trim();
+    if(!q) return;
+    var resultsEl = document.getElementById('search-results');
+    resultsEl.innerHTML = '<div class="search-empty">🔍 검색 중...</div>';
+
+    try {
+        var url = 'https://nominatim.openstreetmap.org/search?format=json&q='
+            + encodeURIComponent(q)
+            + '&countrycodes=kr&limit=5&accept-language=ko';
+        var res = await fetch(url, {headers:{'Accept-Language':'ko'}});
+        var data = await res.json();
+
+        if(!data.length){
+            resultsEl.innerHTML = '<div class="search-empty">검색 결과가 없습니다.</div>';
+            return;
+        }
+
+        resultsEl.innerHTML = '';
+        data.forEach(function(item){
+            var parts = item.display_name.split(',');
+            var main = parts[0].trim();
+            var sub  = parts.slice(1,4).join(',').trim();
+            var div = document.createElement('div');
+            div.className = 'search-result-item';
+            div.innerHTML = '<div class="addr-main">'+main+'</div>'
+                          + '<div class="addr-sub">'+sub+'</div>';
+            div.onclick = function(){
+                var lat = parseFloat(item.lat);
+                var lng = parseFloat(item.lon);
+                map.setView([lat,lng], 17);
+                if(searchMarker) map.removeLayer(searchMarker);
+                searchMarker = L.marker([lat,lng], {
+                    icon: L.divIcon({
+                        html:'<div style="background:#2980b9;color:white;border-radius:50% 50% 50% 0;width:28px;height:28px;transform:rotate(-45deg);border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;"><span style="transform:rotate(45deg);font-size:14px;">📍</span></div>',
+                        className:'', iconSize:[28,28], iconAnchor:[14,28]
+                    })
+                }).addTo(map).bindPopup('<b>'+main+'</b><br><small>'+sub+'</small>').openPopup();
+                resultsEl.innerHTML = '';
+            };
+            resultsEl.appendChild(div);
+        });
+    } catch(e) {
+        resultsEl.innerHTML = '<div class="search-empty">검색 오류가 발생했습니다.</div>';
+    }
+}
+
+// ─────────────────────────────────────
+// 4. 마커 메모
+// ─────────────────────────────────────
+var markers = [];
+var pendingLatLng = null;
+var selectedColor = '#e74c3c';
+var isMarkerMode = false;
+
+var MARKER_ICONS = {
+    '#e74c3c': '🔴', '#e67e22': '🟠', '#2ecc71': '🟢',
+    '#3498db': '🔵', '#9b59b6': '🟣', '#1a252f': '⚫'
+};
+
+function toggleMarkerMode(){
+    isMarkerMode = !isMarkerMode;
+    var btn = document.getElementById('btn-add-marker');
+    var hint = document.getElementById('marker-hint');
+    var mapEl = document.getElementById('map');
+
+    if(isMarkerMode){
+        btn.classList.add('active');
+        btn.textContent = '✖ 취소';
+        hint.classList.add('visible');
+        mapEl.classList.add('marker-adding-mode');
+    } else {
+        btn.classList.remove('active');
+        btn.textContent = '+ 핀 추가';
+        hint.classList.remove('visible');
+        mapEl.classList.remove('marker-adding-mode');
+    }
+}
+
+// ESC 키 취소
+document.addEventListener('keydown', function(e){
+    if(e.key === 'Escape'){
+        if(isMarkerMode) toggleMarkerMode();
+        closeModal();
+    }
+});
+
+// 지도 클릭 → 마커 추가 모드일 때 모달 열기
+map.on('click', function(e){
+    if(!isMarkerMode) return;
+    pendingLatLng = e.latlng;
+    document.getElementById('m-title').value = '';
+    document.getElementById('m-memo').value = '';
+    // 색상 초기화
+    document.querySelectorAll('.color-dot').forEach(function(d){ d.classList.remove('selected'); });
+    document.querySelector('.color-dot[data-color="#e74c3c"]').classList.add('selected');
+    selectedColor = '#e74c3c';
+    document.getElementById('marker-modal').classList.add('active');
+    setTimeout(function(){ document.getElementById('m-title').focus(); }, 100);
+    toggleMarkerMode();
+});
+
+function selectColor(el){
+    document.querySelectorAll('.color-dot').forEach(function(d){ d.classList.remove('selected'); });
+    el.classList.add('selected');
+    selectedColor = el.dataset.color;
+}
+
+function closeModal(){
+    document.getElementById('marker-modal').classList.remove('active');
+    pendingLatLng = null;
+}
+
+function saveMarker(){
+    if(!pendingLatLng) return;
+    var title = document.getElementById('m-title').value.trim() || '관심 지역';
+    var memo  = document.getElementById('m-memo').value.trim();
+    var color = selectedColor;
+    var icon  = MARKER_ICONS[color] || '📍';
+    var id    = Date.now();
+
+    // Leaflet 마커 생성
+    var leafletMarker = L.marker(pendingLatLng, {
+        icon: L.divIcon({
+            html: '<div style="width:32px;height:32px;background:'+color+';border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:2.5px solid white;box-shadow:0 3px 8px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;"><span style="transform:rotate(45deg);font-size:15px;">'+icon+'</span></div>',
+            className:'', iconSize:[32,32], iconAnchor:[16,32]
+        })
+    }).addTo(map);
+
+    var popupHtml = '<div style="min-width:160px">'
+        + '<b style="font-size:13px;color:'+color+'">'+icon+' '+title+'</b>'
+        + (memo ? '<p style="font-size:12px;margin:6px 0 0;color:#555">'+memo+'</p>' : '')
+        + '<p style="font-size:10px;margin:6px 0 0;color:#aaa">'
+        + pendingLatLng.lat.toFixed(6)+', '+pendingLatLng.lng.toFixed(6)+'</p>'
+        + '</div>';
+    leafletMarker.bindPopup(popupHtml);
+
+    markers.push({ id:id, title:title, memo:memo, color:color, icon:icon, latlng:pendingLatLng, leafletMarker:leafletMarker });
+    closeModal();
+    renderMarkerList();
+}
+
+function renderMarkerList(){
+    var listEl = document.getElementById('marker-list');
+    if(!markers.length){
+        listEl.innerHTML = '<div class="marker-empty">핀이 없습니다.<br>지도를 클릭해 관심지역을 표시하세요.</div>';
+        return;
+    }
+    listEl.innerHTML = '';
+    markers.forEach(function(m){
+        var div = document.createElement('div');
+        div.className = 'marker-item';
+        div.innerHTML = '<div class="marker-item-icon">'+m.icon+'</div>'
+            + '<div class="marker-item-body">'
+            + '<div class="marker-item-title">'+m.title+'</div>'
+            + '<div class="marker-item-memo">'+(m.memo||'메모 없음')+'</div>'
+            + '</div>'
+            + '<button class="marker-item-del" title="삭제" onclick="event.stopPropagation();deleteMarker('+m.id+')">✕</button>';
+        div.onclick = function(){
+            map.setView(m.latlng, Math.max(map.getZoom(), 17));
+            m.leafletMarker.openPopup();
+        };
+        listEl.appendChild(div);
+    });
+}
+
+function deleteMarker(id){
+    var idx = markers.findIndex(function(m){ return m.id === id; });
+    if(idx === -1) return;
+    map.removeLayer(markers[idx].leafletMarker);
+    markers.splice(idx, 1);
+    renderMarkerList();
+}
+
+function clearAllMarkers(){
+    if(!markers.length) return;
+    if(!confirm('모든 핀('+markers.length+'개)을 삭제하시겠습니까?')) return;
+    markers.forEach(function(m){ map.removeLayer(m.leafletMarker); });
+    markers = [];
+    renderMarkerList();
+}
+
+// ─────────────────────────────────────
+// 5. 영역 선택
 // ─────────────────────────────────────
 var selRect=null, selBounds=null, isSelecting=false, selStart=null;
 
@@ -238,7 +682,7 @@ function setStatus(tab,msg,cls){
 }
 
 // ─────────────────────────────────────
-// 4. 좌표 <-> 타일 변환
+// 6. 좌표 <-> 타일 변환
 // ─────────────────────────────────────
 function lngLatToTile(lng,lat,z){
     var n=Math.pow(2,z);
@@ -272,7 +716,7 @@ function calcTilePreview(){
 }
 
 // ─────────────────────────────────────
-// 5. 빠른 저장
+// 7. 빠른 저장
 // ─────────────────────────────────────
 function quickSave(){
     var scale=parseInt(document.getElementById('q-scale').value);
@@ -309,17 +753,15 @@ function quickSave(){
 }
 
 // ─────────────────────────────────────
-// 6. ★ 타일 스티칭 고해상도 저장 (속도 우선, 프록시 없음)
+// 8. 고해상도 타일 스티칭 저장
 // ─────────────────────────────────────
 async function largeSave(){
     var z=parseInt(document.getElementById('l-zoom').value);
     var tileType=document.getElementById('l-tiletype').value;
     var bounds=getExportBounds();
     var sw=bounds.getSouthWest(), ne=bounds.getNorthEast();
-
-    var nwT=lngLatToTile(sw.lng,ne.lat,z);  // 좌상단 타일
-    var seT=lngLatToTile(ne.lng,sw.lat,z);  // 우하단 타일
-
+    var nwT=lngLatToTile(sw.lng,ne.lat,z);
+    var seT=lngLatToTile(ne.lng,sw.lat,z);
     var tW=seT.x-nwT.x+1, tH=seT.y-nwT.y+1, total=tW*tH;
 
     if(total>1500){
@@ -330,7 +772,6 @@ async function largeSave(){
     var extMap={'Base':'png','Satellite':'jpeg','Hybrid':'png'};
     var ext=extMap[tileType];
     var urlTpl='https://xdworld.vworld.kr/2d/'+tileType+'/service/{z}/{x}/{y}.'+ext;
-
     var canvasW=tW*256, canvasH=tH*256;
     var offscreen=document.createElement('canvas');
     offscreen.width=canvasW; offscreen.height=canvasH;
@@ -340,7 +781,6 @@ async function largeSave(){
 
     var loaded=0, failed=0;
 
-    // 타일 1개 로드 (프록시 없이 원본 URL 직접 호출 - 속도 빠름)
     function loadTile(tx,ty){
         return new Promise(function(resolve){
             var url=urlTpl.replace('{z}',z).replace('{x}',tx).replace('{y}',ty);
@@ -352,7 +792,6 @@ async function largeSave(){
                 loaded++; updateProgress(loaded,total); resolve();
             };
             img.onerror=function(){
-                // 실패한 타일은 회색 표시
                 var px=(tx-nwT.x)*256, py=(ty-nwT.y)*256;
                 ctx.fillStyle='#cccccc'; ctx.fillRect(px,py,256,256);
                 ctx.fillStyle='rgba(0,0,0,0.15)'; ctx.font='12px sans-serif';
@@ -363,7 +802,6 @@ async function largeSave(){
         });
     }
 
-    // 배치 처리 (동시 6개씩)
     var allTiles=[];
     for(var ty=nwT.y;ty<=seT.y;ty++)
         for(var tx=nwT.x;tx<=seT.x;tx++)
@@ -378,8 +816,8 @@ async function largeSave(){
     hideOverlay();
 
     if(failed===total){
-        setStatus('large','❌ 모든 타일 로드 실패 — 로컬 서버(Live Server) 등에서 CORS 해제 실행 필요','err');
-        alert('타일을 불러올 수 없습니다.\n\n【해결 방법】\n크롬을 CORS 해제 모드(--disable-web-security)로 실행하셨는지 확인해주세요.');
+        setStatus('large','❌ 모든 타일 로드 실패 — CORS 해제 후 재시도 필요','err');
+        alert('타일을 불러올 수 없습니다.\n\n【해결 방법】\n크롬을 CORS 해제 모드(--disable-web-security)로 실행해 주세요.');
         return;
     }
 
@@ -389,7 +827,7 @@ async function largeSave(){
 }
 
 // ─────────────────────────────────────
-// 7. 유틸
+// 9. 유틸
 // ─────────────────────────────────────
 function showOverlay(msg,sub){
     document.getElementById('overlay-msg').textContent=msg;
