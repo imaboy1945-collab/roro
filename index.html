@@ -1,447 +1,443 @@
 <!DOCTYPE html>
-
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
     <title>나만의 프롭테크 지도</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-image/leaflet-image.js"></script>
+    <!-- 카카오 지도 SDK (백업용) -->
+    <script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=1a1dda0da225eee6e89c7610fa04ba77&libraries=services"></script>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 
-```
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet-image/leaflet-image.js"></script>
-<!-- 카카오 지도 SDK (백업용) -->
-<script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=1a1dda0da225eee6e89c7610fa04ba77&libraries=services"></script>
+    <style>
+        :root {
+            --primary: #03c75a;
+            --primary-dark: #02a84a;
+            --primary-light: #f0fdf6;
+            --primary-border: #bbf7d0;
+            --dark: #111827;
+            --dark2: #1f2937;
+            --red: #dc2626;
+            --bg: #f5f5f5;
+            --card: #ffffff;
+            --text-main: #111827;
+            --text-sub: #6b7280;
+            --text-caption: #9ca3af;
+            --border: #e5e7eb;
+            --shadow-card: 0 1px 4px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.04);
+            --radius: 12px;
+            --radius-sm: 8px;
+        }
 
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Noto Sans KR', 'Malgun Gothic', sans-serif;
+            display: flex; height: 100vh; overflow: hidden;
+            background: var(--bg);
+        }
 
-<style>
-    :root {
-        --primary: #03c75a;
-        --primary-dark: #02a84a;
-        --primary-light: #f0fdf6;
-        --primary-border: #bbf7d0;
-        --dark: #111827;
-        --dark2: #1f2937;
-        --red: #dc2626;
-        --bg: #f5f5f5;
-        --card: #ffffff;
-        --text-main: #111827;
-        --text-sub: #6b7280;
-        --text-caption: #9ca3af;
-        --border: #e5e7eb;
-        --shadow-card: 0 1px 4px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.04);
-        --radius: 12px;
-        --radius-sm: 8px;
-    }
+        /* ────────────────── 사이드바 ────────────────── */
+        #sidebar {
+            width: 400px;
+            min-width: 0;
+            flex-shrink: 0;
+            background: var(--bg);
+            z-index: 1000;
+            display: flex; flex-direction: column;
+            overflow: hidden;
+            transition: width 0.28s cubic-bezier(.4,0,.2,1);
+        }
+        #sidebar.collapsed {
+            width: 0 !important;
+            min-width: 0 !important;
+        }
 
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-        font-family: 'Noto Sans KR', 'Malgun Gothic', sans-serif;
-        display: flex; height: 100vh; overflow: hidden;
-        background: var(--bg);
-    }
+        /* 토글 버튼 — 패널 경계에 fixed 고정 */
+        #sidebar-toggle {
+            position: fixed;
+            top: 50%;
+            left: 400px;
+            transform: translateY(-50%);
+            width: 18px; height: 52px;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-left: none;
+            border-radius: 0 8px 8px 0;
+            cursor: pointer;
+            z-index: 2000;
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 3px 0 8px rgba(0,0,0,0.12);
+            transition: left 0.28s cubic-bezier(.4,0,.2,1), background 0.15s;
+        }
+        #sidebar-toggle:hover { background: var(--primary-light); }
+        #sidebar-toggle svg { transition: transform 0.28s; }
+        body.sidebar-collapsed #sidebar-toggle { left: 0; }
+        body.sidebar-collapsed #sidebar-toggle svg { transform: rotate(180deg); }
 
-    /* ────────────────── 사이드바 ────────────────── */
-    #sidebar {
-        width: 400px;
-        flex-shrink: 0;
-        background: var(--bg);
-        z-index: 1000;
-        display: flex; flex-direction: column;
-        overflow: hidden;
-        transition: width 0.28s cubic-bezier(.4,0,.2,1);
-        position: relative;
-    }
-    #sidebar.collapsed {
-        width: 0;
-    }
+        /* 사이드바 내부 스크롤 영역 */
+        #sidebar-inner {
+            flex: 1; overflow-y: auto; padding: 12px 14px 24px 10px;
+        }
 
-    /* 토글 버튼 — 패널 경계에 fixed 고정 */
-    #sidebar-toggle {
-        position: fixed;
-        top: 50%;
-        left: 400px;
-        transform: translateY(-50%);
-        width: 20px; height: 56px;
-        background: var(--card);
-        border: 1px solid var(--border);
-        border-left: none;
-        border-radius: 0 10px 10px 0;
-        cursor: pointer;
-        z-index: 1001;
-        display: flex; align-items: center; justify-content: center;
-        box-shadow: 3px 0 10px rgba(0,0,0,0.1);
-        transition: left 0.28s cubic-bezier(.4,0,.2,1), background 0.15s;
-    }
-    #sidebar-toggle:hover { background: var(--primary-light); }
-    #sidebar-toggle svg { transition: transform 0.28s; }
-    body.sidebar-collapsed #sidebar-toggle { left: 0; }
-    body.sidebar-collapsed #sidebar-toggle svg { transform: rotate(180deg); }
+        /* ─ 로고 헤더 ─ */
+        .logo {
+            display: flex; align-items: center; gap: 10px;
+            padding: 14px 14px 12px 12px;
+            border-bottom: 1px solid var(--border);
+            background: var(--card);
+        }
+        .logo-icon {
+            width: 34px; height: 34px; background: var(--dark);
+            border-radius: 9px; display: flex; align-items: center;
+            justify-content: center; flex-shrink: 0;
+        }
+        .logo-text { font-size: 16px; font-weight: 700; color: var(--text-main); letter-spacing: -0.3px; }
+        .logo-sub  { font-size: 11px; color: var(--text-caption); margin-top: 1px; }
 
-    /* 사이드바 내부 스크롤 영역 */
-    #sidebar-inner {
-        flex: 1; overflow-y: auto; padding: 12px 14px 24px 10px;
-    }
+        /* ─ 공통 카드 ─ */
+        .panel-card {
+            background: var(--card);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow-card);
+            margin-bottom: 10px;
+            overflow: hidden;
+        }
+        .panel-header {
+            display: flex; align-items: center; gap: 8px;
+            padding: 11px 14px 10px;
+            border-bottom: 1px solid var(--border);
+        }
+        .panel-header-icon {
+            width: 26px; height: 26px;
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+        }
+        .panel-header-title {
+            font-size: 13px; font-weight: 700; color: var(--text-main); letter-spacing: -0.2px;
+        }
+        .panel-body { padding: 11px 14px 12px 10px; }
 
-    /* ─ 로고 헤더 ─ */
-    .logo {
-        display: flex; align-items: center; gap: 10px;
-        padding: 14px 14px 12px 12px;
-        border-bottom: 1px solid var(--border);
-        background: var(--card);
-    }
-    .logo-icon {
-        width: 34px; height: 34px; background: var(--dark);
-        border-radius: 9px; display: flex; align-items: center;
-        justify-content: center; flex-shrink: 0;
-    }
-    .logo-text { font-size: 16px; font-weight: 700; color: var(--text-main); letter-spacing: -0.3px; }
-    .logo-sub  { font-size: 11px; color: var(--text-caption); margin-top: 1px; }
+        /* 아이콘 색상 — 그린/블랙만 */
+        .icon-green svg { color: var(--primary); }
+        .icon-dark  svg { color: var(--dark); }
 
-    /* ─ 공통 카드 ─ */
-    .panel-card {
-        background: var(--card);
-        border-radius: var(--radius);
-        box-shadow: var(--shadow-card);
-        margin-bottom: 10px;
-        overflow: hidden;
-    }
-    .panel-header {
-        display: flex; align-items: center; gap: 8px;
-        padding: 11px 14px 10px;
-        border-bottom: 1px solid var(--border);
-    }
-    .panel-header-icon {
-        width: 26px; height: 26px;
-        display: flex; align-items: center; justify-content: center;
-        flex-shrink: 0;
-    }
-    .panel-header-title {
-        font-size: 13px; font-weight: 700; color: var(--text-main); letter-spacing: -0.2px;
-    }
-    .panel-body { padding: 11px 14px 12px 10px; }
+        /* ── 주소 검색 ── */
+        .search-row { display: flex; gap: 7px; position: relative; }
+        .search-input-wrap { flex: 1; position: relative; display: flex; }
+        .search-row input {
+            flex: 1; padding: 9px 36px 9px 12px;
+            border: 1.5px solid var(--border);
+            border-radius: var(--radius-sm);
+            font-size: 13px; outline: none;
+            font-family: inherit; color: var(--text-main);
+            transition: border-color 0.18s, box-shadow 0.18s;
+            background: var(--bg);
+        }
+        .search-row input::placeholder { color: var(--text-caption); }
+        .search-row input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(3,199,90,0.15);
+            background: #fff;
+        }
+        .search-clear-btn {
+            position: absolute; right: 8px; top: 50%;
+            transform: translateY(-50%);
+            background: none; border: none; cursor: pointer;
+            color: var(--text-caption); font-size: 15px;
+            padding: 2px 4px; border-radius: 50%;
+            display: none; align-items: center; justify-content: center;
+            transition: color 0.15s, background 0.15s;
+        }
+        .search-clear-btn:hover { color: var(--dark); background: var(--border); }
+        .search-clear-btn.visible { display: flex; }
+        .search-row button {
+            padding: 9px 14px;
+            background: var(--dark); color: white;
+            border: none; border-radius: var(--radius-sm);
+            font-size: 13px; font-weight: 500;
+            cursor: pointer; white-space: nowrap;
+            font-family: inherit;
+            transition: background 0.18s;
+        }
+        .search-row button:hover { background: #374151; }
 
-    /* 아이콘 색상 — 그린/블랙만 */
-    .icon-green svg { color: var(--primary); }
-    .icon-dark  svg { color: var(--dark); }
+        #search-results { margin-top: 8px; max-height: 150px; overflow-y: auto; }
+        .search-result-item {
+            padding: 9px 6px; cursor: pointer;
+            border-bottom: 1px solid var(--border);
+            transition: background 0.12s;
+        }
+        .search-result-item:last-child { border-bottom: none; }
+        .search-result-item:hover { background: var(--primary-light); border-radius: 6px; }
+        .addr-main { font-size: 13px; font-weight: 600; color: var(--text-main); }
+        .addr-sub  { font-size: 11px; color: var(--text-sub); margin-top: 3px; }
+        .search-empty { font-size: 12px; color: var(--text-caption); text-align: center; padding: 10px 0; }
 
-    /* ── 주소 검색 ── */
-    .search-row { display: flex; gap: 7px; position: relative; }
-    .search-input-wrap { flex: 1; position: relative; display: flex; }
-    .search-row input {
-        flex: 1; padding: 9px 36px 9px 12px;
-        border: 1.5px solid var(--border);
-        border-radius: var(--radius-sm);
-        font-size: 13px; outline: none;
-        font-family: inherit; color: var(--text-main);
-        transition: border-color 0.18s, box-shadow 0.18s;
-        background: var(--bg);
-    }
-    .search-row input::placeholder { color: var(--text-caption); }
-    .search-row input:focus {
-        border-color: var(--primary);
-        box-shadow: 0 0 0 3px rgba(3,199,90,0.15);
-        background: #fff;
-    }
-    .search-clear-btn {
-        position: absolute; right: 8px; top: 50%;
-        transform: translateY(-50%);
-        background: none; border: none; cursor: pointer;
-        color: var(--text-caption); font-size: 15px;
-        padding: 2px 4px; border-radius: 50%;
-        display: none; align-items: center; justify-content: center;
-        transition: color 0.15s, background 0.15s;
-    }
-    .search-clear-btn:hover { color: var(--dark); background: var(--border); }
-    .search-clear-btn.visible { display: flex; }
-    .search-row button {
-        padding: 9px 14px;
-        background: var(--dark); color: white;
-        border: none; border-radius: var(--radius-sm);
-        font-size: 13px; font-weight: 500;
-        cursor: pointer; white-space: nowrap;
-        font-family: inherit;
-        transition: background 0.18s;
-    }
-    .search-row button:hover { background: #374151; }
+        /* ── 마커 ── */
+        .marker-mode-row { display: flex; gap: 6px; margin-bottom: 10px; }
+        .marker-mode-btn {
+            flex: 1; padding: 8px 6px;
+            border-radius: var(--radius-sm);
+            border: 1.5px solid var(--border);
+            background: var(--bg); color: var(--text-sub);
+            font-size: 12px; font-weight: 500;
+            cursor: pointer; text-align: center;
+            font-family: inherit;
+            display: flex; align-items: center; justify-content: center; gap: 5px;
+            transition: all 0.18s;
+        }
+        .marker-mode-btn:hover { background: var(--primary-light); border-color: var(--primary-border); color: var(--dark); }
+        .marker-mode-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+        .marker-mode-btn.del-btn:hover { background: #fef2f2; border-color: #fecaca; color: var(--red); }
 
-    #search-results { margin-top: 8px; max-height: 150px; overflow-y: auto; }
-    .search-result-item {
-        padding: 9px 6px; cursor: pointer;
-        border-bottom: 1px solid var(--border);
-        transition: background 0.12s;
-    }
-    .search-result-item:last-child { border-bottom: none; }
-    .search-result-item:hover { background: var(--primary-light); border-radius: 6px; }
-    .addr-main { font-size: 13px; font-weight: 600; color: var(--text-main); }
-    .addr-sub  { font-size: 11px; color: var(--text-sub); margin-top: 3px; }
-    .search-empty { font-size: 12px; color: var(--text-caption); text-align: center; padding: 10px 0; }
+        .marker-list { max-height: 180px; overflow-y: auto; }
+        .marker-item {
+            display: flex; align-items: flex-start; gap: 9px;
+            padding: 8px 6px; border-radius: var(--radius-sm);
+            cursor: pointer; transition: background 0.12s;
+        }
+        .marker-item:hover { background: var(--bg); }
+        .marker-item + .marker-item { border-top: 1px solid var(--border); }
+        .marker-item-icon { font-size: 18px; flex-shrink: 0; }
+        .marker-item-body { flex: 1; min-width: 0; }
+        .marker-item-title { font-size: 13px; font-weight: 500; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .marker-item-memo  { font-size: 11px; color: var(--text-sub); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .marker-item-del {
+            background: none; border: none; color: var(--text-caption);
+            font-size: 14px; cursor: pointer; padding: 2px 4px;
+            border-radius: 4px; transition: all 0.12s; flex-shrink: 0;
+        }
+        .marker-item-del:hover { background: #fef2f2; color: var(--red); }
+        .marker-empty { font-size: 12px; color: var(--text-caption); text-align: center; padding: 14px 0; line-height: 1.6; }
 
-    /* ── 마커 ── */
-    .marker-mode-row { display: flex; gap: 6px; margin-bottom: 10px; }
-    .marker-mode-btn {
-        flex: 1; padding: 8px 6px;
-        border-radius: var(--radius-sm);
-        border: 1.5px solid var(--border);
-        background: var(--bg); color: var(--text-sub);
-        font-size: 12px; font-weight: 500;
-        cursor: pointer; text-align: center;
-        font-family: inherit;
-        display: flex; align-items: center; justify-content: center; gap: 5px;
-        transition: all 0.18s;
-    }
-    .marker-mode-btn:hover { background: var(--primary-light); border-color: var(--primary-border); color: var(--dark); }
-    .marker-mode-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
-    .marker-mode-btn.del-btn:hover { background: #fef2f2; border-color: #fecaca; color: var(--red); }
+        /* ── 마커 모달 ── */
+        #marker-modal {
+            display: none; position: fixed; inset: 0;
+            background: rgba(0,0,0,0.4); z-index: 9998;
+            align-items: center; justify-content: center;
+        }
+        #marker-modal.active { display: flex; }
+        .modal-box {
+            background: white; border-radius: 16px;
+            padding: 22px 22px 20px; width: 310px;
+            box-shadow: 0 12px 40px rgba(0,0,0,0.18);
+            animation: popIn 0.18s ease;
+        }
+        @keyframes popIn { from{transform:scale(0.92);opacity:0} to{transform:scale(1);opacity:1} }
+        .modal-title { font-size: 15px; font-weight: 700; color: var(--text-main); margin-bottom: 14px; }
+        .modal-label { font-size: 11px; color: var(--text-sub); font-weight: 500; margin-bottom: 5px; margin-top: 12px; letter-spacing: 0.3px; }
+        .modal-input, .modal-textarea {
+            width: 100%; padding: 9px 11px;
+            border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+            font-size: 13px; outline: none; font-family: inherit;
+            color: var(--text-main); transition: border-color 0.18s, box-shadow 0.18s;
+        }
+        .modal-textarea { resize: vertical; min-height: 68px; }
+        .modal-input:focus, .modal-textarea:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(3,199,90,0.15);
+        }
+        .modal-color-row { display: flex; gap: 8px; margin-top: 6px; }
+        .color-dot {
+            width: 26px; height: 26px; border-radius: 50%; cursor: pointer;
+            border: 3px solid transparent; transition: transform 0.15s, box-shadow 0.15s;
+        }
+        .color-dot:hover { transform: scale(1.15); }
+        .color-dot.selected { box-shadow: 0 0 0 2px #fff, 0 0 0 4px #374151; }
+        .modal-btn-row { display: flex; gap: 8px; margin-top: 18px; }
+        .modal-btn {
+            flex: 1; padding: 10px; border-radius: var(--radius-sm); border: none;
+            font-size: 13px; font-weight: 600; cursor: pointer;
+            font-family: inherit; transition: all 0.18s;
+        }
+        .modal-btn-cancel { background: var(--bg); color: var(--text-sub); }
+        .modal-btn-cancel:hover { background: var(--border); }
+        .modal-btn-save { background: var(--primary); color: white; }
+        .modal-btn-save:hover { background: var(--primary-dark); }
 
-    .marker-list { max-height: 180px; overflow-y: auto; }
-    .marker-item {
-        display: flex; align-items: flex-start; gap: 9px;
-        padding: 8px 6px; border-radius: var(--radius-sm);
-        cursor: pointer; transition: background 0.12s;
-    }
-    .marker-item:hover { background: var(--bg); }
-    .marker-item + .marker-item { border-top: 1px solid var(--border); }
-    .marker-item-icon { font-size: 18px; flex-shrink: 0; }
-    .marker-item-body { flex: 1; min-width: 0; }
-    .marker-item-title { font-size: 13px; font-weight: 500; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .marker-item-memo  { font-size: 11px; color: var(--text-sub); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .marker-item-del {
-        background: none; border: none; color: var(--text-caption);
-        font-size: 14px; cursor: pointer; padding: 2px 4px;
-        border-radius: 4px; transition: all 0.12s; flex-shrink: 0;
-    }
-    .marker-item-del:hover { background: #fef2f2; color: var(--red); }
-    .marker-empty { font-size: 12px; color: var(--text-caption); text-align: center; padding: 14px 0; line-height: 1.6; }
+        /* ── 측정 ── */
+        .measure-btn-row { display: flex; gap: 6px; margin-bottom: 9px; }
+        .measure-btn {
+            flex: 1; padding: 8px 6px;
+            border-radius: var(--radius-sm); border: 1.5px solid var(--border);
+            background: var(--bg); color: var(--text-sub);
+            font-size: 12px; font-weight: 500; cursor: pointer;
+            font-family: inherit; text-align: center;
+            display: flex; align-items: center; justify-content: center; gap: 4px;
+            transition: all 0.18s;
+        }
+        .measure-btn:hover { background: var(--primary-light); border-color: var(--primary-border); color: var(--dark); }
+        .measure-btn.active { background: var(--dark); color: white; border-color: var(--dark); }
+        .measure-btn.clear-btn:hover { background: #fef2f2; border-color: #fecaca; color: var(--red); }
+        .measure-result {
+            background: var(--primary-light); border: 1px solid var(--primary-border);
+            border-radius: var(--radius-sm); padding: 9px 11px;
+            font-size: 12px; color: var(--text-main); line-height: 1.7; display: none;
+        }
+        .measure-result.visible { display: block; }
+        .measure-result b { color: var(--dark); font-size: 13px; }
+        .measure-hint-text {
+            font-size: 11px; color: var(--text-sub);
+            margin-top: 7px; line-height: 1.5;
+            padding: 6px 9px; background: var(--bg);
+            border-radius: 6px; border-left: 3px solid var(--primary);
+        }
 
-    /* ── 마커 모달 ── */
-    #marker-modal {
-        display: none; position: fixed; inset: 0;
-        background: rgba(0,0,0,0.4); z-index: 9998;
-        align-items: center; justify-content: center;
-    }
-    #marker-modal.active { display: flex; }
-    .modal-box {
-        background: white; border-radius: 16px;
-        padding: 22px 22px 20px; width: 310px;
-        box-shadow: 0 12px 40px rgba(0,0,0,0.18);
-        animation: popIn 0.18s ease;
-    }
-    @keyframes popIn { from{transform:scale(0.92);opacity:0} to{transform:scale(1);opacity:1} }
-    .modal-title { font-size: 15px; font-weight: 700; color: var(--text-main); margin-bottom: 14px; }
-    .modal-label { font-size: 11px; color: var(--text-sub); font-weight: 500; margin-bottom: 5px; margin-top: 12px; letter-spacing: 0.3px; }
-    .modal-input, .modal-textarea {
-        width: 100%; padding: 9px 11px;
-        border: 1.5px solid var(--border); border-radius: var(--radius-sm);
-        font-size: 13px; outline: none; font-family: inherit;
-        color: var(--text-main); transition: border-color 0.18s, box-shadow 0.18s;
-    }
-    .modal-textarea { resize: vertical; min-height: 68px; }
-    .modal-input:focus, .modal-textarea:focus {
-        border-color: var(--primary);
-        box-shadow: 0 0 0 3px rgba(3,199,90,0.15);
-    }
-    .modal-color-row { display: flex; gap: 8px; margin-top: 6px; }
-    .color-dot {
-        width: 26px; height: 26px; border-radius: 50%; cursor: pointer;
-        border: 3px solid transparent; transition: transform 0.15s, box-shadow 0.15s;
-    }
-    .color-dot:hover { transform: scale(1.15); }
-    .color-dot.selected { box-shadow: 0 0 0 2px #fff, 0 0 0 4px #374151; }
-    .modal-btn-row { display: flex; gap: 8px; margin-top: 18px; }
-    .modal-btn {
-        flex: 1; padding: 10px; border-radius: var(--radius-sm); border: none;
-        font-size: 13px; font-weight: 600; cursor: pointer;
-        font-family: inherit; transition: all 0.18s;
-    }
-    .modal-btn-cancel { background: var(--bg); color: var(--text-sub); }
-    .modal-btn-cancel:hover { background: var(--border); }
-    .modal-btn-save { background: var(--primary); color: white; }
-    .modal-btn-save:hover { background: var(--primary-dark); }
+        /* ── 공유 ── */
+        .share-btn-row { display: flex; gap: 7px; }
+        .share-btn {
+            flex: 1; padding: 9px 6px;
+            border-radius: var(--radius-sm); border: none;
+            font-size: 12px; font-weight: 600; cursor: pointer;
+            font-family: inherit;
+            display: flex; align-items: center; justify-content: center; gap: 5px;
+            transition: all 0.18s;
+        }
+        .share-btn-copy { background: var(--dark); color: white; }
+        .share-btn-copy:hover { background: #374151; transform: translateY(-1px); }
+        .share-btn-kakao { background: #fee500; color: #3c1e1e; }
+        .share-btn-kakao:hover { background: #fada00; transform: translateY(-1px); }
+        .share-toast {
+            position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%);
+            background: var(--dark); color: white; padding: 11px 20px;
+            border-radius: 24px; font-size: 13px; font-weight: 500;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.22); z-index: 9997;
+            opacity: 0; pointer-events: none; transition: opacity 0.25s, transform 0.25s;
+            font-family: inherit;
+        }
+        .share-toast.visible { opacity: 1; transform: translateX(-50%) translateY(-6px); }
 
-    /* ── 측정 ── */
-    .measure-btn-row { display: flex; gap: 6px; margin-bottom: 9px; }
-    .measure-btn {
-        flex: 1; padding: 8px 6px;
-        border-radius: var(--radius-sm); border: 1.5px solid var(--border);
-        background: var(--bg); color: var(--text-sub);
-        font-size: 12px; font-weight: 500; cursor: pointer;
-        font-family: inherit; text-align: center;
-        display: flex; align-items: center; justify-content: center; gap: 4px;
-        transition: all 0.18s;
-    }
-    .measure-btn:hover { background: var(--primary-light); border-color: var(--primary-border); color: var(--dark); }
-    .measure-btn.active { background: var(--dark); color: white; border-color: var(--dark); }
-    .measure-btn.clear-btn:hover { background: #fef2f2; border-color: #fecaca; color: var(--red); }
-    .measure-result {
-        background: var(--primary-light); border: 1px solid var(--primary-border);
-        border-radius: var(--radius-sm); padding: 9px 11px;
-        font-size: 12px; color: var(--text-main); line-height: 1.7; display: none;
-    }
-    .measure-result.visible { display: block; }
-    .measure-result b { color: var(--dark); font-size: 13px; }
-    .measure-hint-text {
-        font-size: 11px; color: var(--text-sub);
-        margin-top: 7px; line-height: 1.5;
-        padding: 6px 9px; background: var(--bg);
-        border-radius: 6px; border-left: 3px solid var(--primary);
-    }
+        /* ── 내보내기 패널 ── */
+        .export-panel {
+            background: var(--dark);
+            border-radius: var(--radius);
+            padding: 15px; margin-bottom: 10px; color: white;
+            box-shadow: var(--shadow-card);
+        }
+        .export-panel-title {
+            font-size: 13px; font-weight: 700; margin-bottom: 12px;
+            display: flex; align-items: center; gap: 7px;
+            color: rgba(255,255,255,0.92); letter-spacing: -0.2px;
+        }
+        .export-tabs { display: flex; gap: 4px; margin-bottom: 13px; background: rgba(255,255,255,0.06); border-radius: 8px; padding: 3px; }
+        .etab {
+            flex: 1; padding: 7px 4px; border-radius: 6px;
+            border: none; background: transparent;
+            color: rgba(255,255,255,0.45); font-size: 11px; font-weight: 600;
+            cursor: pointer; text-align: center;
+            font-family: inherit; transition: all 0.18s;
+        }
+        .etab:hover { color: rgba(255,255,255,0.8); }
+        .etab.active { background: var(--primary); color: white; box-shadow: 0 1px 6px rgba(3,199,90,0.35); }
 
-    /* ── 공유 ── */
-    .share-btn-row { display: flex; gap: 7px; }
-    .share-btn {
-        flex: 1; padding: 9px 6px;
-        border-radius: var(--radius-sm); border: none;
-        font-size: 12px; font-weight: 600; cursor: pointer;
-        font-family: inherit;
-        display: flex; align-items: center; justify-content: center; gap: 5px;
-        transition: all 0.18s;
-    }
-    .share-btn-copy { background: var(--dark); color: white; }
-    .share-btn-copy:hover { background: #374151; transform: translateY(-1px); }
-    .share-btn-kakao { background: #fee500; color: #3c1e1e; }
-    .share-btn-kakao:hover { background: #fada00; transform: translateY(-1px); }
-    .share-toast {
-        position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%);
-        background: var(--dark); color: white; padding: 11px 20px;
-        border-radius: 24px; font-size: 13px; font-weight: 500;
-        box-shadow: 0 4px 16px rgba(0,0,0,0.22); z-index: 9997;
-        opacity: 0; pointer-events: none; transition: opacity 0.25s, transform 0.25s;
-        font-family: inherit;
-    }
-    .share-toast.visible { opacity: 1; transform: translateX(-50%) translateY(-6px); }
+        .tab-pane { display: none; }
+        .tab-pane.active { display: block; }
 
-    /* ── 내보내기 패널 ── */
-    .export-panel {
-        background: var(--dark);
-        border-radius: var(--radius);
-        padding: 15px; margin-bottom: 10px; color: white;
-        box-shadow: var(--shadow-card);
-    }
-    .export-panel-title {
-        font-size: 13px; font-weight: 700; margin-bottom: 12px;
-        display: flex; align-items: center; gap: 7px;
-        color: rgba(255,255,255,0.92); letter-spacing: -0.2px;
-    }
-    .export-tabs { display: flex; gap: 4px; margin-bottom: 13px; background: rgba(255,255,255,0.06); border-radius: 8px; padding: 3px; }
-    .etab {
-        flex: 1; padding: 7px 4px; border-radius: 6px;
-        border: none; background: transparent;
-        color: rgba(255,255,255,0.45); font-size: 11px; font-weight: 600;
-        cursor: pointer; text-align: center;
-        font-family: inherit; transition: all 0.18s;
-    }
-    .etab:hover { color: rgba(255,255,255,0.8); }
-    .etab.active { background: var(--primary); color: white; box-shadow: 0 1px 6px rgba(3,199,90,0.35); }
+        .form-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+        .form-row label { font-size: 11px; color: rgba(255,255,255,0.5); white-space: nowrap; min-width: 56px; font-weight: 500; }
+        .form-row select {
+            flex: 1; padding: 7px 8px;
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 6px; background: rgba(255,255,255,0.08);
+            color: white; font-size: 12px; outline: none; font-family: inherit;
+        }
+        .form-row select option { background: var(--dark); }
 
-    .tab-pane { display: none; }
-    .tab-pane.active { display: block; }
+        .status-bar { font-size: 11px; color: rgba(255,255,255,0.4); margin: 7px 0; min-height: 14px; line-height: 1.5; }
+        .status-bar.ok   { color: var(--primary); }
+        .status-bar.err  { color: #f87171; }
+        .status-bar.warn { color: #fbbf24; }
 
-    .form-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-    .form-row label { font-size: 11px; color: rgba(255,255,255,0.5); white-space: nowrap; min-width: 56px; font-weight: 500; }
-    .form-row select {
-        flex: 1; padding: 7px 8px;
-        border: 1px solid rgba(255,255,255,0.15);
-        border-radius: 6px; background: rgba(255,255,255,0.08);
-        color: white; font-size: 12px; outline: none; font-family: inherit;
-    }
-    .form-row select option { background: var(--dark); }
+        .tile-preview {
+            background: rgba(255,255,255,0.05); border-radius: 6px;
+            padding: 8px 10px; margin-bottom: 9px; font-size: 11px;
+            color: rgba(255,255,255,0.55); line-height: 1.8; display: none;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+        .tile-preview.visible { display: block; }
+        .tile-preview b { color: var(--primary); font-size: 12px; }
 
-    .status-bar { font-size: 11px; color: rgba(255,255,255,0.4); margin: 7px 0; min-height: 14px; line-height: 1.5; }
-    .status-bar.ok   { color: var(--primary); }
-    .status-bar.err  { color: #f87171; }
-    .status-bar.warn { color: #fbbf24; }
+        .btn-row { display: flex; gap: 7px; }
+        .btn-main {
+            flex: 1; padding: 10px 7px; border-radius: var(--radius-sm); border: none;
+            font-size: 12px; font-weight: 600; cursor: pointer;
+            font-family: inherit;
+            display: flex; align-items: center; justify-content: center; gap: 5px;
+            transition: all 0.18s;
+        }
+        .btn-main:hover { filter: brightness(1.1); transform: translateY(-1px); }
+        .btn-main:disabled { filter: none; transform: none; opacity: 0.45; cursor: not-allowed; }
+        .btn-green  { background: var(--primary); color: white; }
+        .btn-orange { background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2) !important; color: white; }
+        .btn-ghost  { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.18) !important; color: rgba(255,255,255,0.8); }
 
-    .tile-preview {
-        background: rgba(255,255,255,0.05); border-radius: 6px;
-        padding: 8px 10px; margin-bottom: 9px; font-size: 11px;
-        color: rgba(255,255,255,0.55); line-height: 1.8; display: none;
-        border: 1px solid rgba(255,255,255,0.08);
-    }
-    .tile-preview.visible { display: block; }
-    .tile-preview b { color: var(--primary); font-size: 12px; }
+        /* ── 로딩 오버레이 ── */
+        #capture-overlay {
+            display: none; position: fixed; inset: 0;
+            background: rgba(0,0,0,0.72); z-index: 9999;
+            align-items: center; justify-content: center;
+            flex-direction: column; gap: 14px; color: white;
+        }
+        #capture-overlay.active { display: flex; }
+        .spinner { width: 44px; height: 44px; border: 4px solid rgba(255,255,255,0.2); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.7s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        #overlay-msg { font-size: 15px; font-weight: 700; }
+        #overlay-sub { font-size: 12px; color: rgba(255,255,255,0.55); }
+        #overlay-prog { width: 240px; height: 6px; background: rgba(255,255,255,0.15); border-radius: 4px; overflow: hidden; }
+        #overlay-prog-bar { height: 100%; background: var(--primary); border-radius: 4px; width: 0%; transition: width 0.15s; }
 
-    .btn-row { display: flex; gap: 7px; }
-    .btn-main {
-        flex: 1; padding: 10px 7px; border-radius: var(--radius-sm); border: none;
-        font-size: 12px; font-weight: 600; cursor: pointer;
-        font-family: inherit;
-        display: flex; align-items: center; justify-content: center; gap: 5px;
-        transition: all 0.18s;
-    }
-    .btn-main:hover { filter: brightness(1.1); transform: translateY(-1px); }
-    .btn-main:disabled { filter: none; transform: none; opacity: 0.45; cursor: not-allowed; }
-    .btn-green  { background: var(--primary); color: white; }
-    .btn-orange { background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2) !important; color: white; }
-    .btn-ghost  { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.18) !important; color: rgba(255,255,255,0.8); }
+        #map {
+            flex: 1;
+            height: 100vh;
+            min-width: 0;
+        }
+        #map.selecting-mode    { cursor: crosshair !important; }
+        #map.marker-adding-mode{ cursor: cell !important; }
+        #map.measuring-mode    { cursor: crosshair !important; }
 
-    /* ── 로딩 오버레이 ── */
-    #capture-overlay {
-        display: none; position: fixed; inset: 0;
-        background: rgba(0,0,0,0.72); z-index: 9999;
-        align-items: center; justify-content: center;
-        flex-direction: column; gap: 14px; color: white;
-    }
-    #capture-overlay.active { display: flex; }
-    .spinner { width: 44px; height: 44px; border: 4px solid rgba(255,255,255,0.2); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.7s linear infinite; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    #overlay-msg { font-size: 15px; font-weight: 700; }
-    #overlay-sub { font-size: 12px; color: rgba(255,255,255,0.55); }
-    #overlay-prog { width: 240px; height: 6px; background: rgba(255,255,255,0.15); border-radius: 4px; overflow: hidden; }
-    #overlay-prog-bar { height: 100%; background: var(--primary); border-radius: 4px; width: 0%; transition: width 0.15s; }
+        /* 줌 컨트롤 위치 보정 */
+        .leaflet-bottom.leaflet-right {
+            bottom: 80px !important;
+            right: 16px !important;
+        }
+        .leaflet-control-zoom {
+            border: none !important;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.18) !important;
+        }
+        .leaflet-control-zoom a {
+            width: 38px !important; height: 38px !important;
+            line-height: 38px !important;
+            font-size: 20px !important;
+            background: white !important;
+            color: var(--dark) !important;
+            display: block !important;
+        }
+        .leaflet-control-zoom-in  { border-radius: 8px 8px 0 0 !important; border-bottom: 1px solid var(--border) !important; }
+        .leaflet-control-zoom-out { border-radius: 0 0 8px 8px !important; }
+        .leaflet-control-zoom a:hover { background: var(--primary-light) !important; color: var(--primary) !important; }
 
-    #map {
-        flex: 1;
-        height: 100vh;
-        min-width: 0;
-    }
-    #map.selecting-mode    { cursor: crosshair !important; }
-    #map.marker-adding-mode{ cursor: cell !important; }
-    #map.measuring-mode    { cursor: crosshair !important; }
+        #marker-hint {
+            display: none; position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
+            background: var(--primary); color: white; padding: 8px 18px;
+            border-radius: 20px; font-size: 13px; font-weight: 600;
+            z-index: 5000; box-shadow: 0 4px 14px rgba(0,0,0,0.2);
+            pointer-events: none; font-family: inherit;
+        }
+        #marker-hint.visible { display: block; }
 
-    /* 줌 컨트롤 위치 보정 */
-    .leaflet-bottom.leaflet-right {
-        bottom: 80px !important;
-        right: 16px !important;
-    }
-    .leaflet-control-zoom {
-        border: none !important;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.18) !important;
-    }
-    .leaflet-control-zoom a {
-        width: 38px !important; height: 38px !important;
-        line-height: 38px !important;
-        font-size: 20px !important;
-        background: white !important;
-        color: var(--dark) !important;
-        display: block !important;
-    }
-    .leaflet-control-zoom-in  { border-radius: 8px 8px 0 0 !important; border-bottom: 1px solid var(--border) !important; }
-    .leaflet-control-zoom-out { border-radius: 0 0 8px 8px !important; }
-    .leaflet-control-zoom a:hover { background: var(--primary-light) !important; color: var(--primary) !important; }
-
-    #marker-hint {
-        display: none; position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
-        background: var(--primary); color: white; padding: 8px 18px;
-        border-radius: 20px; font-size: 13px; font-weight: 600;
-        z-index: 5000; box-shadow: 0 4px 14px rgba(0,0,0,0.2);
-        pointer-events: none; font-family: inherit;
-    }
-    #marker-hint.visible { display: block; }
-
-    ::-webkit-scrollbar { width: 4px; }
-    ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
-</style>
-```
-
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+    </style>
 </head>
 <body>
 
 <!-- 로딩 오버레이 -->
-
 <div id="capture-overlay">
     <div class="spinner"></div>
     <div id="overlay-msg">타일을 불러오는 중...</div>
@@ -450,15 +446,12 @@
 </div>
 
 <!-- 마커 추가 힌트 -->
-
 <div id="marker-hint">📍 지도를 클릭해서 핀을 꽂으세요 &nbsp;|&nbsp; ESC 취소</div>
 
 <!-- 공유 토스트 -->
-
 <div class="share-toast" id="share-toast"></div>
 
 <!-- 마커 메모 모달 -->
-
 <div id="marker-modal">
     <div class="modal-box">
         <div class="modal-title">📍 핀 메모 추가</div>
@@ -490,157 +483,154 @@
         </svg>
     </button>
 
-```
-<!-- 로고 -->
-<div class="logo">
-    <div class="logo-icon">🏢</div>
-    <div>
-        <div class="logo-text">My PropMap</div>
-        <div class="logo-sub">프롭테크 지도</div>
+    <!-- 로고 -->
+    <div class="logo">
+        <div class="logo-icon">🏢</div>
+        <div>
+            <div class="logo-text">My PropMap</div>
+            <div class="logo-sub">프롭테크 지도</div>
+        </div>
     </div>
-</div>
 
-<div id="sidebar-inner">
+    <div id="sidebar-inner">
 
-<!-- ── 주소 검색 ── -->
-<div class="panel-card">
-    <div class="panel-header">
-        <div class="panel-header-icon icon-blue">🔍</div>
-        <div class="panel-header-title">주소 검색</div>
-    </div>
-    <div class="panel-body">
-        <div class="search-row">
-            <div class="search-input-wrap">
-                <input type="text" id="search-input" placeholder="주소 또는 장소명 입력"
-                    onkeydown="if(event.key==='Enter')searchAddress()"
-                    oninput="onSearchInput(this)" />
-                <button class="search-clear-btn" id="search-clear-btn" onclick="clearSearchFull()" title="초기화">✕</button>
+    <!-- ── 주소 검색 ── -->
+    <div class="panel-card">
+        <div class="panel-header">
+            <div class="panel-header-icon icon-blue">🔍</div>
+            <div class="panel-header-title">주소 검색</div>
+        </div>
+        <div class="panel-body">
+            <div class="search-row">
+                <div class="search-input-wrap">
+                    <input type="text" id="search-input" placeholder="주소 또는 장소명 입력"
+                        onkeydown="if(event.key==='Enter')searchAddress()"
+                        oninput="onSearchInput(this)" />
+                    <button class="search-clear-btn" id="search-clear-btn" onclick="clearSearchFull()" title="초기화">✕</button>
+                </div>
+                <button onclick="searchAddress()">검색</button>
             </div>
-            <button onclick="searchAddress()">검색</button>
-        </div>
-        <div id="search-results"></div>
-    </div>
-</div>
-
-<!-- ── 마커 메모 ── -->
-<div class="panel-card">
-    <div class="panel-header">
-        <div class="panel-header-icon icon-orange">📍</div>
-        <div class="panel-header-title">핀 메모</div>
-    </div>
-    <div class="panel-body">
-        <div class="marker-mode-row">
-            <div class="marker-mode-btn" id="btn-add-marker" onclick="toggleMarkerMode()">+ 핀 추가</div>
-            <div class="marker-mode-btn del-btn" id="btn-clear-markers" onclick="clearAllMarkers()">🗑 전체 삭제</div>
-        </div>
-        <div class="marker-list" id="marker-list">
-            <div class="marker-empty">핀이 없습니다.<br>지도를 클릭해 관심지역을 표시하세요.</div>
-        </div>
-    </div>
-</div>
-
-<!-- ── 측정 도구 ── -->
-<div class="panel-card">
-    <div class="panel-header">
-        <div class="panel-header-icon icon-blue2">📐</div>
-        <div class="panel-header-title">거리 · 면적 측정</div>
-    </div>
-    <div class="panel-body">
-        <div class="measure-btn-row">
-            <div class="measure-btn" id="btn-measure-distance" onclick="toggleMeasure('distance')">📏 거리</div>
-            <div class="measure-btn" id="btn-measure-area" onclick="toggleMeasure('area')">📐 면적</div>
-            <div class="measure-btn clear-btn" id="btn-measure-clear" onclick="clearMeasure()">🗑 지우기</div>
-        </div>
-        <div class="measure-result" id="measure-result"></div>
-        <div class="measure-hint-text" id="measure-hint-text" style="display:none;"></div>
-    </div>
-</div>
-
-<!-- ── 공유 ── -->
-<div class="panel-card">
-    <div class="panel-header">
-        <div class="panel-header-icon icon-purple">🔗</div>
-        <div class="panel-header-title">지도 공유</div>
-    </div>
-    <div class="panel-body">
-        <div class="share-btn-row">
-            <button class="share-btn share-btn-copy" onclick="copyShareLink()">📋 링크 복사</button>
-            <button class="share-btn share-btn-kakao" onclick="shareKakao()">💬 카카오톡</button>
-        </div>
-    </div>
-</div>
-
-<!-- ── 내보내기 ── -->
-<div class="export-panel">
-    <div class="export-panel-title">📸 지도 이미지 내보내기</div>
-
-    <div class="export-tabs">
-        <div class="etab active" onclick="switchTab('quick')">⚡ 빠른 저장</div>
-        <div class="etab" onclick="switchTab('large')">🔍 고해상도 타일</div>
-    </div>
-
-    <div class="tab-pane active" id="tab-quick">
-        <div class="form-row">
-            <label>배율</label>
-            <select id="q-scale">
-                <option value="1">1× 표준</option>
-                <option value="2" selected>2× 고화질</option>
-                <option value="3">3× 최고</option>
-            </select>
-            <label>형식</label>
-            <select id="q-format"><option value="png">PNG</option><option value="jpeg">JPEG</option></select>
-        </div>
-        <div class="status-bar" id="quick-status">현재 화면을 캡처합니다.</div>
-        <div class="btn-row">
-            <button class="btn-main btn-ghost" id="btn-area-sel" onclick="startAreaSelect(false)">✏️ 영역 선택</button>
-            <button class="btn-main btn-green" onclick="quickSave()">💾 저장</button>
+            <div id="search-results"></div>
         </div>
     </div>
 
-    <div class="tab-pane" id="tab-large">
-        <div class="form-row">
-            <label>지도 타입</label>
-            <select id="l-tiletype">
-                <option value="Base">일반지도</option>
-                <option value="Satellite" selected>위성사진</option>
-                <option value="Hybrid">하이브리드</option>
-            </select>
+    <!-- ── 마커 메모 ── -->
+    <div class="panel-card">
+        <div class="panel-header">
+            <div class="panel-header-icon icon-orange">📍</div>
+            <div class="panel-header-title">핀 메모</div>
         </div>
-        <div class="form-row">
-            <label>내보내기 줌</label>
-            <select id="l-zoom" onchange="calcTilePreview()">
-                <option value="15">줌 15</option>
-                <option value="16">줌 16</option>
-                <option value="17">줌 17</option>
-                <option value="18" selected>줌 18 (권장)</option>
-                <option value="19">줌 19 (최고화질)</option>
-            </select>
-        </div>
-        <div class="form-row">
-            <label>영역 기준</label>
-            <select id="l-area-mode" onchange="calcTilePreview()">
-                <option value="viewport">현재 화면 전체</option>
-                <option value="selection">선택 영역 사용</option>
-            </select>
-        </div>
-
-        <div class="tile-preview" id="tile-preview">
-            <div>예상 타일 수: <b id="prev-tiles">-</b></div>
-            <div>출력 해상도: <b id="prev-res">-</b></div>
-            <div>예상 소요: <b id="prev-time">-</b></div>
-        </div>
-
-        <div class="status-bar" id="large-status">줌레벨을 선택하면 정보가 표시됩니다.</div>
-        <div class="btn-row">
-            <button class="btn-main btn-ghost" id="btn-area-sel2" onclick="startAreaSelect(true)">✏️ 영역 그리기</button>
-            <button class="btn-main btn-orange" onclick="largeSave()">🔍 큰 이미지 저장</button>
+        <div class="panel-body">
+            <div class="marker-mode-row">
+                <div class="marker-mode-btn" id="btn-add-marker" onclick="toggleMarkerMode()">+ 핀 추가</div>
+                <div class="marker-mode-btn del-btn" id="btn-clear-markers" onclick="clearAllMarkers()">🗑 전체 삭제</div>
+            </div>
+            <div class="marker-list" id="marker-list">
+                <div class="marker-empty">핀이 없습니다.<br>지도를 클릭해 관심지역을 표시하세요.</div>
+            </div>
         </div>
     </div>
-</div>
 
-</div><!-- /sidebar-inner -->
-```
+    <!-- ── 측정 도구 ── -->
+    <div class="panel-card">
+        <div class="panel-header">
+            <div class="panel-header-icon icon-blue2">📐</div>
+            <div class="panel-header-title">거리 · 면적 측정</div>
+        </div>
+        <div class="panel-body">
+            <div class="measure-btn-row">
+                <div class="measure-btn" id="btn-measure-distance" onclick="toggleMeasure('distance')">📏 거리</div>
+                <div class="measure-btn" id="btn-measure-area" onclick="toggleMeasure('area')">📐 면적</div>
+                <div class="measure-btn clear-btn" id="btn-measure-clear" onclick="clearMeasure()">🗑 지우기</div>
+            </div>
+            <div class="measure-result" id="measure-result"></div>
+            <div class="measure-hint-text" id="measure-hint-text" style="display:none;"></div>
+        </div>
+    </div>
 
+    <!-- ── 공유 ── -->
+    <div class="panel-card">
+        <div class="panel-header">
+            <div class="panel-header-icon icon-purple">🔗</div>
+            <div class="panel-header-title">지도 공유</div>
+        </div>
+        <div class="panel-body">
+            <div class="share-btn-row">
+                <button class="share-btn share-btn-copy" onclick="copyShareLink()">📋 링크 복사</button>
+                <button class="share-btn share-btn-kakao" onclick="shareKakao()">💬 카카오톡</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── 내보내기 ── -->
+    <div class="export-panel">
+        <div class="export-panel-title">📸 지도 이미지 내보내기</div>
+
+        <div class="export-tabs">
+            <div class="etab active" onclick="switchTab('quick')">⚡ 빠른 저장</div>
+            <div class="etab" onclick="switchTab('large')">🔍 고해상도 타일</div>
+        </div>
+
+        <div class="tab-pane active" id="tab-quick">
+            <div class="form-row">
+                <label>배율</label>
+                <select id="q-scale">
+                    <option value="1">1× 표준</option>
+                    <option value="2" selected>2× 고화질</option>
+                    <option value="3">3× 최고</option>
+                </select>
+                <label>형식</label>
+                <select id="q-format"><option value="png">PNG</option><option value="jpeg">JPEG</option></select>
+            </div>
+            <div class="status-bar" id="quick-status">현재 화면을 캡처합니다.</div>
+            <div class="btn-row">
+                <button class="btn-main btn-ghost" id="btn-area-sel" onclick="startAreaSelect(false)">✏️ 영역 선택</button>
+                <button class="btn-main btn-green" onclick="quickSave()">💾 저장</button>
+            </div>
+        </div>
+
+        <div class="tab-pane" id="tab-large">
+            <div class="form-row">
+                <label>지도 타입</label>
+                <select id="l-tiletype">
+                    <option value="Base">일반지도</option>
+                    <option value="Satellite" selected>위성사진</option>
+                    <option value="Hybrid">하이브리드</option>
+                </select>
+            </div>
+            <div class="form-row">
+                <label>내보내기 줌</label>
+                <select id="l-zoom" onchange="calcTilePreview()">
+                    <option value="15">줌 15</option>
+                    <option value="16">줌 16</option>
+                    <option value="17">줌 17</option>
+                    <option value="18" selected>줌 18 (권장)</option>
+                    <option value="19">줌 19 (최고화질)</option>
+                </select>
+            </div>
+            <div class="form-row">
+                <label>영역 기준</label>
+                <select id="l-area-mode" onchange="calcTilePreview()">
+                    <option value="viewport">현재 화면 전체</option>
+                    <option value="selection">선택 영역 사용</option>
+                </select>
+            </div>
+
+            <div class="tile-preview" id="tile-preview">
+                <div>예상 타일 수: <b id="prev-tiles">-</b></div>
+                <div>출력 해상도: <b id="prev-res">-</b></div>
+                <div>예상 소요: <b id="prev-time">-</b></div>
+            </div>
+
+            <div class="status-bar" id="large-status">줌레벨을 선택하면 정보가 표시됩니다.</div>
+            <div class="btn-row">
+                <button class="btn-main btn-ghost" id="btn-area-sel2" onclick="startAreaSelect(true)">✏️ 영역 그리기</button>
+                <button class="btn-main btn-orange" onclick="largeSave()">🔍 큰 이미지 저장</button>
+            </div>
+        </div>
+    </div>
+
+    </div><!-- /sidebar-inner -->
 </div>
 
 <div id="map"></div>
@@ -653,8 +643,9 @@ function toggleSidebar(){
     var sb = document.getElementById('sidebar');
     sb.classList.toggle('collapsed');
     document.body.classList.toggle('sidebar-collapsed');
-    // CSS transition(0.28s) 완료 후 지도 리사이즈
-    setTimeout(function(){ map.invalidateSize(); }, 300);
+    // 트랜지션 중간(150ms) + 완료 후(300ms) 두 번 리사이즈
+    setTimeout(function(){ map.invalidateSize(); }, 150);
+    setTimeout(function(){ map.invalidateSize(); }, 320);
 }
 
 // ─────────────────────────────────────
@@ -1400,6 +1391,5 @@ function downloadCanvas(canvas,name,fmt,mime){
     a.click();
 }
 </script>
-
 </body>
 </html>
